@@ -1,13 +1,15 @@
 ﻿"""
-TTS Manager - Handles multiple Text-to-Speech services
+TTS Manager - ENHANCED with Audio Activity Monitoring
 Supports: ElevenLabs, StreamElements, Coqui TTS, Azure
+NEW: Real-time audio monitoring for avatar sync
 """
 
 import os
 import requests
 from pathlib import Path
 import pygame
-import base64
+import threading
+import time
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 
@@ -28,7 +30,22 @@ class TTSManager:
         }
 
         # Initialize pygame mixer for audio playback
-        pygame.mixer.init()
+        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+
+        # Audio monitoring
+        self.is_playing = False
+        self.audio_active = False  # True when sound is playing, False during silence
+        self.monitoring_thread = None
+        self.stop_monitoring = False
+
+        # Callbacks for audio activity
+        self.on_audio_start = None  # Called when audio becomes active
+        self.on_audio_pause = None  # Called when audio pauses (silence)
+        self.on_audio_resume = None  # Called when audio resumes after pause
+
+        # Audio level monitoring
+        self.silence_threshold = 0.01  # Adjust sensitivity (0.0-1.0)
+        self.min_pause_duration = 0.2  # Minimum silence duration to trigger pause (seconds)
 
         # Initialize service-specific clients
         if service == 'elevenlabs':
@@ -39,7 +56,7 @@ class TTSManager:
                 print("Warning: ELEVENLABS_API_KEY not found")
 
     def speak(self, text, callback_on_start=None, callback_on_end=None):
-        """Convert text to speech and play audio"""
+        """Convert text to speech and play audio with monitoring"""
         if not text.strip():
             return
 
@@ -61,12 +78,12 @@ class TTSManager:
                 print(f"Unknown TTS service: {self.service}")
                 return
 
-            # Play audio file
+            # Play audio file with monitoring
             if audio_file and audio_file.exists():
                 if callback_on_start:
                     callback_on_start()
 
-                self._play_audio(audio_file)
+                self._play_audio_with_monitoring(audio_file, text)
 
                 if callback_on_end:
                     callback_on_end()
@@ -82,7 +99,6 @@ class TTSManager:
             # Handle custom voice format "Name (voice_id)"
             voice_id = self.voice
             if '(' in voice_id and ')' in voice_id:
-                # Extract voice_id from "Name (voice_id)" format
                 voice_id = voice_id.split('(')[1].split(')')[0]
 
             # Generate audio with custom settings
@@ -99,8 +115,7 @@ class TTSManager:
                 )
             )
 
-            # Use unique filename to avoid permission issues
-            import time
+            # Use unique filename
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'elevenlabs_{timestamp}.mp3'
 
@@ -118,7 +133,6 @@ class TTSManager:
     def _streamelements_tts(self, text):
         """Generate speech using StreamElements (free)"""
         try:
-            # StreamElements TTS API endpoint
             voice_name = self.voice if self.voice != 'default' else 'Brian'
             url = f"https://api.streamelements.com/kappa/v2/speech"
 
@@ -130,12 +144,9 @@ class TTSManager:
             response = requests.get(url, params=params, stream=True)
             response.raise_for_status()
 
-            # Use unique filename to avoid permission issues
-            import time
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'streamelements_{timestamp}.mp3'
 
-            # Save audio
             with open(audio_file, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=1024):
                     f.write(chunk)
@@ -151,12 +162,9 @@ class TTSManager:
         try:
             from TTS.api import TTS
 
-            # Initialize model (you can change model)
             tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC",
                      progress_bar=False, gpu=False)
 
-            # Use unique filename
-            import time
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'coqui_{timestamp}.wav'
 
@@ -186,12 +194,9 @@ class TTSManager:
                 region=service_region
             )
 
-            # Set voice
             voice_name = self.voice if self.voice != 'default' else 'en-US-JennyNeural'
             speech_config.speech_synthesis_voice_name = voice_name
 
-            # Use unique filename
-            import time
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'azure_{timestamp}.wav'
 
@@ -214,18 +219,136 @@ class TTSManager:
             print(f"Azure TTS error: {e}")
             return None
 
-    def _play_audio(self, audio_file):
-        """Play audio file using pygame"""
+    def _play_audio_with_monitoring(self, audio_file, text):
+        """
+        Play audio file with real-time monitoring
+        Triggers callbacks when audio activity changes
+        """
         try:
             pygame.mixer.music.load(str(audio_file))
+
+            # Parse text for natural pauses (simple method)
+            pause_points = self._find_text_pauses(text)
+
+            # Start playback
             pygame.mixer.music.play()
+            self.is_playing = True
+            self.audio_active = True
+
+            if self.on_audio_start:
+                self.on_audio_start()
+
+            # Start monitoring thread
+            self.stop_monitoring = False
+            self.monitoring_thread = threading.Thread(
+                target=self._monitor_audio_activity,
+                args=(pause_points,),
+                daemon=True
+            )
+            self.monitoring_thread.start()
 
             # Wait for audio to finish
             while pygame.mixer.music.get_busy():
                 pygame.time.Clock().tick(10)
 
+            # Stop monitoring
+            self.stop_monitoring = True
+            if self.monitoring_thread:
+                self.monitoring_thread.join(timeout=0.5)
+
+            self.is_playing = False
+            self.audio_active = False
+
         except Exception as e:
             print(f"Audio playback error: {e}")
+            self.is_playing = False
+            self.audio_active = False
+
+    def _find_text_pauses(self, text):
+        """
+        Analyze text to estimate natural pause points
+        Returns list of approximate timestamps (in seconds)
+        """
+        # Estimate speaking rate: ~150 words per minute = ~2.5 words per second
+        words_per_second = 2.5
+
+        pause_points = []
+        words = text.split()
+        current_time = 0.0
+
+        for i, word in enumerate(words):
+            # Estimate time for this word (rough approximation)
+            word_duration = len(word) / (words_per_second * 5)  # 5 chars per word avg
+            current_time += word_duration
+
+            # Check for punctuation that indicates pauses
+            if word.endswith('.') or word.endswith('!') or word.endswith('?'):
+                # Longer pause after sentence
+                pause_points.append({
+                    'time': current_time,
+                    'duration': 0.4,
+                    'type': 'sentence'
+                })
+                current_time += 0.4
+            elif word.endswith(',') or word.endswith(';'):
+                # Shorter pause after comma
+                pause_points.append({
+                    'time': current_time,
+                    'duration': 0.2,
+                    'type': 'comma'
+                })
+                current_time += 0.2
+
+        return pause_points
+
+    def _monitor_audio_activity(self, pause_points):
+        """
+        Monitor audio playback and trigger callbacks during pauses
+        Uses text-based pause detection for simplicity
+        """
+        start_time = time.time()
+        last_state = True  # Start as active
+        pause_index = 0
+
+        while not self.stop_monitoring and self.is_playing:
+            current_time = time.time() - start_time
+
+            # Check if we're at a pause point
+            if pause_index < len(pause_points):
+                pause = pause_points[pause_index]
+
+                # Are we at this pause point?
+                if current_time >= pause['time']:
+                    # Trigger pause callback
+                    if self.audio_active and self.on_audio_pause:
+                        print(f"[TTS] Pause detected at {current_time:.2f}s ({pause['type']})")
+                        self.audio_active = False
+                        self.on_audio_pause()
+
+                    # Wait for pause duration
+                    time.sleep(pause['duration'])
+
+                    # Resume
+                    if not self.audio_active and self.on_audio_resume:
+                        print(f"[TTS] Resuming at {current_time:.2f}s")
+                        self.audio_active = True
+                        self.on_audio_resume()
+
+                    pause_index += 1
+
+            time.sleep(0.05)  # Check every 50ms
+
+    def set_audio_callbacks(self, on_start=None, on_pause=None, on_resume=None):
+        """
+        Set callbacks for audio activity monitoring
+
+        on_start: Called when audio playback starts
+        on_pause: Called when audio pauses (silence detected)
+        on_resume: Called when audio resumes after pause
+        """
+        self.on_audio_start = on_start
+        self.on_audio_pause = on_pause
+        self.on_audio_resume = on_resume
 
     def set_service(self, service):
         """Change TTS service"""
@@ -238,7 +361,10 @@ class TTSManager:
     def stop(self):
         """Stop current audio playback"""
         try:
+            self.stop_monitoring = True
             pygame.mixer.music.stop()
+            self.is_playing = False
+            self.audio_active = False
         except:
             pass
 
@@ -278,10 +404,22 @@ STREAMELEMENTS_VOICES = [
 
 
 if __name__ == '__main__':
-    # Test TTS
-    print("Testing TTS Manager...")
+    # Test TTS with audio monitoring
+    print("Testing TTS Manager with Audio Monitoring...")
+
+    def on_start():
+        print("[TEST] Audio started - mouth should be OPEN")
+
+    def on_pause():
+        print("[TEST] Audio paused - mouth should CLOSE")
+
+    def on_resume():
+        print("[TEST] Audio resumed - mouth should OPEN")
 
     tts = TTSManager(service='streamelements', voice='Brian')
-    tts.speak("Hello! This is a test of the text to speech system.")
+    tts.set_audio_callbacks(on_start=on_start, on_pause=on_pause, on_resume=on_resume)
+
+    test_text = "Hello! This is a test. Can you see the pauses? I hope so, because that would be really cool!"
+    tts.speak(test_text)
 
     print("Test complete!")

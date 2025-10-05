@@ -17,7 +17,7 @@ from dotenv import load_dotenv, set_key
 class IntegratedChatbotApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Hey besties let's talk to robots")
+        self.root.title("Hey besties let's commmune with robots")
         self.root.geometry("900x900")
         self.root.minsize(750, 800)
 
