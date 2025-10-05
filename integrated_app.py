@@ -1,7 +1,6 @@
 ﻿"""
-Complete AI Chatbot System - Integrated Application (IMPROVED)
-Enhanced with better UX, push-to-talk, and foolproof design
-FIXED: Screenshot functionality now works correctly
+Complete AI Chatbot System - Integrated Application
+UPDATED: Added Twitch TTS output controls for reading username and message
 """
 
 import tkinter as tk
@@ -18,14 +17,12 @@ from dotenv import load_dotenv, set_key
 class IntegratedChatbotApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("AI Chatbot System")
-        self.root.geometry("1200x900")  # Taller to show everything
-        self.root.minsize(1100, 800)  # Ensure minimum shows all controls
+        self.root.title("Hey besties let's talk to robots")
+        self.root.geometry("900x900")
+        self.root.minsize(750, 800)
 
-        # Set window icon
         self.set_window_icon()
 
-        # Load environment variables from .env file
         self.env_file = Path('.env')
         if self.env_file.exists():
             load_dotenv(self.env_file)
@@ -35,7 +32,6 @@ class IntegratedChatbotApp:
             self.create_default_env_file()
             load_dotenv(self.env_file)
 
-        # Lavender color scheme
         self.colors = {
             'bg': '#E6E6FA',
             'fg': '#4B0082',
@@ -45,17 +41,19 @@ class IntegratedChatbotApp:
             'text_bg': '#FFFFFF'
         }
 
+        # Load custom UI font
+        self.ui_font = self.load_custom_font('Quicksand-Regular.ttf', 10, 'normal')
+        self.ui_font_bold = self.load_custom_font('Quicksand-Bold.ttf', 10, 'bold')
+        self.ui_font_large = self.load_custom_font('Quicksand-Medium.ttf', 11, 'normal')
+
         self.root.configure(bg=self.colors['bg'])
 
-        # Initialize engine
         self.engine = ChatbotEngine()
         self.config = self.engine.config
 
-        # Hotkey states
         self.is_recording = False
         self.hotkey_active = False
 
-        # Available voices for each service
         self.voice_options = {
             'elevenlabs': ['rachel', 'drew', 'clyde', 'paul', 'domi', 'dave', 'fin',
                           'sarah', 'antoni', 'thomas', 'charlie', 'emily', 'elli',
@@ -70,52 +68,71 @@ class IntegratedChatbotApp:
             'coqui-tts': ['default']
         }
 
-        # Create GUI
         self.create_gui()
 
-        # Setup callbacks
         self.engine.on_response_callback = self.display_response
         self.engine.on_speaking_start = self.on_ai_speaking_start
         self.engine.on_speaking_end = self.on_ai_speaking_end
 
-        # Show welcome message
         self.show_welcome_message()
+
+    def load_custom_font(self, font_name, size, weight='normal'):
+        """Load custom font - Windows compatible version"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            font_path = Path('fonts') / font_name
+
+            if font_path.exists():
+                gdi32 = ctypes.WinDLL('gdi32', use_last_error=True)
+                result = gdi32.AddFontResourceExW(
+                    str(font_path.absolute()),
+                    0x10,
+                    0
+                )
+
+                if result > 0:
+                    print(f"[App] Loaded custom font: {font_name}")
+                    # Map filename to font family name
+                    font_families = {
+                        'BubblegumSans-Regular.ttf': 'Bubblegum Sans',
+                        'Quicksand-Regular.ttf': 'Quicksand',
+                        'Quicksand-Medium.ttf': 'Quicksand',
+                        'Quicksand-Bold.ttf': 'Quicksand'
+                    }
+                    family = font_families.get(font_name, 'Arial')
+                    return (family, size, weight)
+                else:
+                    print(f"[App] Failed to load font, using Arial")
+                    return ('Arial', size, weight)
+            else:
+                print(f"[App] Font file not found: {font_path}")
+                return ('Arial', size, weight)
+
+        except Exception as e:
+            print(f"[App] Error loading font: {e}")
+            return ('Arial', size, weight)
 
     def set_window_icon(self):
         """Set window and taskbar icons"""
         try:
-            # Try to load icon.ico for window
             icon_path = Path('icon.ico')
             if icon_path.exists():
                 self.root.iconbitmap(icon_path)
                 print("[App] Window icon loaded from icon.ico")
             else:
                 print("[App] icon.ico not found - using default icon")
-                print("[App] Place an icon.ico file in the program folder to customize")
         except Exception as e:
             print(f"[App] Could not set window icon: {e}")
 
     def create_default_env_file(self):
         """Create a default .env file if it doesn't exist"""
         default_env = """# AI Chatbot System - API Keys
-# Add your API keys below
-
-# OpenAI API Key (Required for GPT models)
-# Get from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=
-
-# ElevenLabs API Key (Optional - for premium TTS)
-# Get from: https://elevenlabs.io/
 ELEVENLABS_API_KEY=
-
-# Azure TTS Keys (Optional)
-# Get from: https://portal.azure.com/
 AZURE_TTS_KEY=
 AZURE_TTS_REGION=eastus
-
-# Twitch OAuth Token (Optional - for chat integration)
-# Get from: https://twitchapps.com/tmi/
-# Format: oauth:yourtokenhere
 TWITCH_OAUTH_TOKEN=
 """
         with open(self.env_file, 'w') as f:
@@ -125,12 +142,8 @@ TWITCH_OAUTH_TOKEN=
     def save_api_key(self, key_name, value):
         """Save API key to .env file"""
         try:
-            # Update environment variable
             os.environ[key_name] = value
-
-            # Save to .env file
             set_key(self.env_file, key_name, value)
-
             print(f"[App] Saved {key_name} to .env file")
             return True
         except Exception as e:
@@ -143,60 +156,52 @@ TWITCH_OAUTH_TOKEN=
 
     def create_gui(self):
         """Create the main GUI interface"""
-        # Main container with proper packing
         main_container = tk.Frame(self.root, bg=self.colors['bg'])
         main_container.pack(fill='both', expand=True)
 
-        # Title with nice spacing
         title_frame = tk.Frame(main_container, bg=self.colors['bg'])
         title_frame.pack(fill='x', pady=(15, 10))
 
         title = tk.Label(
             title_frame,
-            text="🎙️ AI Chatbot System",
-            font=('Arial', 26, 'bold'),
+            text="Lace's Total TTS Bot",
+            font=self.load_custom_font('BubblegumSans-Regular.ttf', 26, 'bold'),
             bg=self.colors['bg'],
             fg=self.colors['fg']
         )
         title.pack()
 
-        # Subtitle
         subtitle = tk.Label(
             title_frame,
-            text="Your intelligent AI companion",
+            text="Talk to fake voices in your head!",
             font=('Arial', 10, 'italic'),
             bg=self.colors['bg'],
             fg=self.colors['accent']
         )
         subtitle.pack()
 
-        # Notebook container (will expand to fill space above control panel)
         notebook_container = tk.Frame(main_container, bg=self.colors['bg'])
         notebook_container.pack(fill='both', expand=True, padx=20, pady=(5, 10))
 
-        # Create notebook
         style = ttk.Style()
         style.theme_use('clam')
         style.configure('TNotebook', background=self.colors['bg'], borderwidth=0)
 
-        # Inactive tabs - smaller
         style.configure('TNotebook.Tab',
                        background=self.colors['button'],
                        foreground='white',
                        padding=[15, 8],
                        font=('Arial', 10))
 
-        # Active tab - larger and more prominent
         style.map('TNotebook.Tab',
                  background=[('selected', self.colors['accent'])],
                  foreground=[('selected', 'white')],
-                 padding=[('selected', [18, 12])],  # Bigger padding when selected
-                 font=[('selected', ('Arial', 11, 'bold'))])  # Bigger font when selected
+                 padding=[('selected', [18, 12])],
+                 font=[('selected', ('Arial', 11, 'bold'))])
 
         notebook = ttk.Notebook(notebook_container)
         notebook.pack(fill='both', expand=True)
 
-        # Create tabs
         self.create_chat_tab(notebook)
         self.create_api_keys_tab(notebook)
         self.create_setup_tab(notebook)
@@ -204,19 +209,16 @@ TWITCH_OAUTH_TOKEN=
         self.create_inputs_tab(notebook)
         self.create_avatar_tab(notebook)
 
-        # Bottom control panel (fixed at bottom, always visible)
         self.create_control_panel(main_container)
 
     def create_chat_tab(self, notebook):
         """Chat interface tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='💬 Chat')
+        notebook.add(tab, text='Chat')
 
-        # Main container
         container = tk.Frame(tab, bg=self.colors['bg'])
         container.pack(fill='both', expand=True, padx=25, pady=20)
 
-        # Chat history display with border
         chat_border = tk.Frame(container, bg=self.colors['accent'], bd=2)
         chat_border.pack(fill='both', expand=True)
 
@@ -233,12 +235,10 @@ TWITCH_OAUTH_TOKEN=
         )
         self.chat_display.pack(fill='both', expand=True, padx=2, pady=2)
 
-        # Configure text tags for styling
         self.chat_display.tag_config('welcome', foreground=self.colors['accent'], font=('Arial', 10))
         self.chat_display.tag_config('header', foreground=self.colors['fg'], font=('Arial', 12, 'bold'))
         self.chat_display.tag_config('system', foreground='#FF6B6B', font=('Consolas', 10, 'italic'))
 
-        # Custom styled scrollbar
         scrollbar = tk.Scrollbar(
             self.chat_display,
             bg=self.colors['accent'],
@@ -252,25 +252,21 @@ TWITCH_OAUTH_TOKEN=
         self.chat_display.config(yscrollcommand=scrollbar.set)
         scrollbar.config(command=self.chat_display.yview)
 
-        # Text input section
         input_section = tk.Frame(container, bg=self.colors['bg'])
         input_section.pack(fill='x', pady=(15, 0))
 
-        # Mode indicator
         self.chat_mode_label = tk.Label(
             input_section,
-            text="💬 Test Mode (responses only, no voice)",
+            text="Send a message below to test the bot's responses",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
         )
         self.chat_mode_label.pack(anchor='w', pady=(0, 8))
 
-        # Input row
         input_row = tk.Frame(input_section, bg=self.colors['bg'])
         input_row.pack(fill='x')
 
-        # Entry with border
         entry_border = tk.Frame(input_row, bg=self.colors['accent'], bd=2)
         entry_border.pack(side='left', fill='x', expand=True, padx=(0, 10))
 
@@ -287,7 +283,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.send_btn = tk.Button(
             input_row,
-            text="📤 Send",
+            text="Send",
             command=self.send_text_message,
             bg=self.colors['button'],
             fg='white',
@@ -300,10 +296,9 @@ TWITCH_OAUTH_TOKEN=
         )
         self.send_btn.pack(side='right')
 
-        # Tip label
         tip_label = tk.Label(
             input_section,
-            text="💡 Tip: You can test AI responses here anytime, even before starting the full chatbot",
+            text="Cool Gamer Tip: You can test bot's responses here anytime, even before starting the full chatbot",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 8, 'italic')
@@ -312,10 +307,8 @@ TWITCH_OAUTH_TOKEN=
 
     def create_scrollable_frame(self, parent):
         """Create a scrollable frame with custom styled scrollbar"""
-        # Create canvas and scrollbar
         canvas = tk.Canvas(parent, bg=self.colors['bg'], highlightthickness=0)
 
-        # Custom styled scrollbar
         scrollbar = tk.Scrollbar(
             parent,
             orient='vertical',
@@ -330,20 +323,17 @@ TWITCH_OAUTH_TOKEN=
 
         scrollable_frame = tk.Frame(canvas, bg=self.colors['bg'])
 
-        # Configure scrolling
         scrollable_frame.bind(
             '<Configure>',
             lambda e: canvas.configure(scrollregion=canvas.bbox('all'))
         )
 
-        canvas.create_window((0, 0), window=scrollable_frame, anchor='n')  # Changed to 'n' for center
+        canvas.create_window((0, 0), window=scrollable_frame, anchor='n')
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        # Pack
         canvas.pack(side='left', fill='both', expand=True)
         scrollbar.pack(side='right', fill='y')
 
-        # Bind mousewheel
         def _on_mousewheel(event):
             canvas.yview_scroll(int(-1*(event.delta/120)), "units")
 
@@ -354,25 +344,18 @@ TWITCH_OAUTH_TOKEN=
     def create_api_keys_tab(self, notebook):
         """API Keys management tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🔑 API Keys')
+        notebook.add(tab, text='API Keys')
 
-        # Use scrollable frame
         scrollable = self.create_scrollable_frame(tab)
 
-        # Instructions
         info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
         info_frame.pack(fill='x', padx=20, pady=20)
 
         info_text = """
-        🔑 API Keys Configuration
+        API Keys Configuration
         
         Enter your API keys below. They will be saved to the .env file automatically.
         Keys are optional except for OpenAI which is required for the chatbot to function.
-        
-        💡 Tips:
-        • Keys are stored locally in your .env file (never sent anywhere except to the respective services)
-        • Click the 👁️ button to show/hide each key
-        • Links to get API keys are provided for each service
         """
 
         tk.Label(
@@ -384,14 +367,13 @@ TWITCH_OAUTH_TOKEN=
             justify='left'
         ).pack(padx=20, pady=20)
 
-        # API Keys section
         keys_section = self.create_section(scrollable, "API Keys", 0)
+        keys_section.grid_columnconfigure(0, weight=1)
+        keys_section.grid_columnconfigure(1, weight=1)
 
-        # Store show/hide state for each key
         self.key_show_states = {}
         self.key_entries = {}
 
-        # OpenAI Key
         self.create_api_key_row(
             keys_section,
             row=0,
@@ -402,7 +384,6 @@ TWITCH_OAUTH_TOKEN=
             description="Required for all GPT models"
         )
 
-        # ElevenLabs Key
         self.create_api_key_row(
             keys_section,
             row=1,
@@ -413,7 +394,6 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - for premium TTS voices"
         )
 
-        # Azure TTS Key
         self.create_api_key_row(
             keys_section,
             row=2,
@@ -424,7 +404,6 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - for Azure neural voices"
         )
 
-        # Azure Region
         azure_region_frame = tk.Frame(keys_section, bg=self.colors['bg'])
         azure_region_frame.grid(row=3, column=0, columnspan=4, sticky='ew', pady=5)
 
@@ -445,15 +424,6 @@ TWITCH_OAUTH_TOKEN=
         self.azure_region_entry.pack(side='left', padx=5)
         self.azure_region_entry.insert(0, self.get_api_key('AZURE_TTS_REGION') or 'eastus')
 
-        tk.Label(
-            azure_region_frame,
-            text="(e.g., eastus, westus2, etc.)",
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
-        ).pack(side='left', padx=5)
-
-        # Twitch OAuth Token
         self.create_api_key_row(
             keys_section,
             row=4,
@@ -464,7 +434,6 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - format: oauth:yourtoken"
         )
 
-        # Save all button
         save_frame = tk.Frame(scrollable, bg=self.colors['bg'])
         save_frame.pack(pady=20)
 
@@ -482,8 +451,9 @@ TWITCH_OAUTH_TOKEN=
             height=2
         ).pack()
 
-        # Status indicators
         status_frame = self.create_section(scrollable, "API Key Status", 1)
+        status_frame.grid_columnconfigure(0, weight=1)
+        status_frame.grid_columnconfigure(1, weight=1)
 
         self.api_status_labels = {}
         status_keys = [
@@ -520,16 +490,13 @@ TWITCH_OAUTH_TOKEN=
 
             self.api_status_labels[key_name] = status_label
 
-        # Update status
         self.update_api_key_status()
 
     def create_api_key_row(self, parent, row, label, key_name, required, link, description):
         """Create a row for entering an API key"""
-        # Container frame
         row_frame = tk.Frame(parent, bg=self.colors['bg'])
         row_frame.grid(row=row, column=0, columnspan=4, sticky='ew', pady=10)
 
-        # Label with required indicator
         label_text = label + (" *" if required else "")
         tk.Label(
             row_frame,
@@ -541,7 +508,6 @@ TWITCH_OAUTH_TOKEN=
             anchor='w'
         ).pack(side='left', padx=5)
 
-        # Entry field (password style)
         entry = tk.Entry(
             row_frame,
             bg=self.colors['entry_bg'],
@@ -553,11 +519,10 @@ TWITCH_OAUTH_TOKEN=
         entry.insert(0, self.get_api_key(key_name))
         self.key_entries[key_name] = entry
 
-        # Show/Hide button
         self.key_show_states[key_name] = False
         show_btn = tk.Button(
             row_frame,
-            text="👁️",
+            text="👁",
             command=lambda: self.toggle_key_visibility(key_name),
             bg=self.colors['button'],
             fg='white',
@@ -568,10 +533,9 @@ TWITCH_OAUTH_TOKEN=
         )
         show_btn.pack(side='left', padx=2)
 
-        # Get key link button
         link_btn = tk.Button(
             row_frame,
-            text="🔗 Get Key",
+            text="Get Key",
             command=lambda: self.open_link(link),
             bg=self.colors['accent'],
             fg='white',
@@ -581,7 +545,6 @@ TWITCH_OAUTH_TOKEN=
         )
         link_btn.pack(side='left', padx=2)
 
-        # Description
         tk.Label(
             row_frame,
             text=description,
@@ -608,18 +571,15 @@ TWITCH_OAUTH_TOKEN=
     def save_all_api_keys(self):
         """Save all API keys to .env file"""
         try:
-            # Save each key
             for key_name, entry in self.key_entries.items():
                 value = entry.get().strip()
-                if value:  # Only save non-empty values
+                if value:
                     self.save_api_key(key_name, value)
 
-            # Save Azure region
             azure_region = self.azure_region_entry.get().strip()
             if azure_region:
                 self.save_api_key('AZURE_TTS_REGION', azure_region)
 
-            # Update status
             self.update_api_key_status()
 
             messagebox.showinfo(
@@ -637,7 +597,6 @@ TWITCH_OAUTH_TOKEN=
             value = self.get_api_key(key_name)
 
             if value and len(value) > 0:
-                # Check if it's a placeholder value
                 if 'your-' in value.lower() or value == '':
                     label.config(text="❌ Not configured", fg='#f44336')
                 else:
@@ -647,23 +606,23 @@ TWITCH_OAUTH_TOKEN=
                 label.config(text="❌ Not configured", fg='#f44336')
 
     def create_setup_tab(self, notebook):
-        """Setup tab with GPT models, personality, memory, response length, and testing - UPDATED"""
+        """Setup tab with GPT models, personality, memory, response length"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='⚙️ Setup')
+        notebook.add(tab, text='Setup')
 
-        # Use scrollable frame
         scrollable = self.create_scrollable_frame(tab)
 
-        config_frame = self.create_section(scrollable, "AI Configuration", 0)
+        config_frame = self.create_section(scrollable, "Bot Configuration", 0)
+        config_frame.grid_columnconfigure(0, weight=1)
+        config_frame.grid_columnconfigure(1, weight=1)
 
-        self.create_entry(config_frame, "AI Name:", 'ai_name', 0)
+        self.create_entry(config_frame, "Bot's Name:", 'ai_name', 0)
         self.create_entry(config_frame, "Your Name:", 'user_name', 1)
 
-        tk.Label(config_frame, text="LLM Model:",
+        tk.Label(config_frame, text="Model:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 11)).grid(row=2, column=0, sticky='w', pady=5)
 
-        # Updated with actually available models
         models = [
             'gpt-4o',
             'gpt-4o-mini',
@@ -678,28 +637,27 @@ TWITCH_OAUTH_TOKEN=
         llm_menu.bind('<<ComboboxSelected>>',
                       lambda e: self.update_config('llm_model', self.llm_var.get()))
 
-        # Model info
         info_label = tk.Label(
             config_frame,
-            text="💡 Tip: gpt-4o supports vision & is most capable. gpt-4o-mini is faster & cheaper.",
+            text=" Crazy Epic Tip: gpt-4o supports vision & is the most capable.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
         )
         info_label.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
-        # NEW: Response Length Settings
         response_section = self.create_section(scrollable, "Response Length & Style", 1)
+        response_section.grid_columnconfigure(0, weight=1)
+        response_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(
             response_section,
-            text="Control how long and detailed the AI's responses are:",
+            text="Control how long and detailed the bot's responses are:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             font=('Arial', 10)
         ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
-        # Response length preset
         tk.Label(response_section, text="Response Length:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
@@ -717,12 +675,11 @@ TWITCH_OAUTH_TOKEN=
         response_length_menu.bind('<<ComboboxSelected>>',
                                   lambda e: self.on_response_length_change())
 
-        # Length descriptions
         length_descriptions = {
-            'brief': '1-2 sentences (~20-40 words) - Perfect for quick chats',
+            'brief': '1-2 sentences (~20-40 words) - Good for quick chats',
             'normal': '2-4 sentences (~40-80 words) - Balanced responses',
             'detailed': '4-8 sentences (~80-150 words) - Thorough explanations',
-            'custom': 'Set your own token limit below'
+            'custom': 'Set your own token limit below (probably not worth it tbh)'
         }
 
         self.length_desc_label = tk.Label(
@@ -736,7 +693,6 @@ TWITCH_OAUTH_TOKEN=
         )
         self.length_desc_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Custom max tokens (only shown when 'custom' is selected)
         self.custom_tokens_frame = tk.Frame(response_section, bg=self.colors['bg'])
         self.custom_tokens_frame.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
@@ -772,21 +728,18 @@ TWITCH_OAUTH_TOKEN=
         )
         self.tokens_value_label.pack(side='left', padx=5)
 
-        # Update token label when slider moves
         self.max_response_tokens_slider.config(
             command=lambda v: self.update_token_label(int(float(v)))
         )
 
-        # Hide/show custom tokens based on selection
         self.update_custom_tokens_visibility()
 
-        # Response style
         tk.Label(response_section, text="Response Style:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
 
         self.response_style_var = tk.StringVar(value=self.config.get('response_style', 'conversational'))
-        response_styles = ['casual', 'conversational', 'professional']
+        response_styles = ['casual', 'conversational', 'professional', 'custom']
         response_style_menu = ttk.Combobox(
             response_section,
             textvariable=self.response_style_var,
@@ -796,12 +749,49 @@ TWITCH_OAUTH_TOKEN=
         )
         response_style_menu.grid(row=4, column=1, sticky='w', pady=5)
         response_style_menu.bind('<<ComboboxSelected>>',
-                                 lambda e: self.update_config('response_style', self.response_style_var.get()))
+                                 lambda e: self.on_response_style_change())
+
+        self.custom_style_frame = tk.Frame(response_section, bg=self.colors['bg'])
+        self.custom_style_frame.grid(row=6, column=0, columnspan=2, sticky='ew', pady=5)
+
+        tk.Label(
+            self.custom_style_frame,
+            text="Custom Style Instructions:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10)
+        ).pack(anchor='w', padx=5)
+
+        self.custom_style_text = tk.Text(
+            self.custom_style_frame,
+            height=3,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9),
+            wrap='word'
+        )
+        self.custom_style_text.pack(fill='x', padx=5, pady=5)
+        self.custom_style_text.insert('1.0', self.config.get('custom_response_style', ''))
+        self.custom_style_text.bind('<FocusOut>',
+                                    lambda e: self.update_config('custom_response_style',
+                                                                 self.custom_style_text.get('1.0', 'end-1c')))
+
+        tk.Label(
+            self.custom_style_frame,
+            text='Example: "Use humor when appropriate. Reference pop culture occasionally."',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 8, 'italic')
+        ).pack(anchor='w', padx=5)
+
+        # Show/hide based on current selection
+        self.update_custom_style_visibility()
 
         style_descriptions = {
             'casual': 'Relaxed, friendly tone with contractions',
             'conversational': 'Warm, natural conversation style',
-            'professional': 'Formal, polished language'
+            'professional': 'Formal, polished language',
+            'custom': 'Define your own custom style below'
         }
 
         self.style_desc_label = tk.Label(
@@ -813,12 +803,12 @@ TWITCH_OAUTH_TOKEN=
         )
         self.style_desc_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Update description when style changes
         response_style_menu.bind('<<ComboboxSelected>>',
                                  lambda e: self.update_style_description())
 
-        # Memory & Context Settings
         memory_section = self.create_section(scrollable, "Memory & Context Settings", 2)
+        memory_section.grid_columnconfigure(0, weight=1)
+        memory_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(
             memory_section,
@@ -828,7 +818,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 10)
         ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
-        # Info about history file
         tk.Label(
             memory_section,
             text="💾 Conversation history is auto-saved to: conversation_history.json",
@@ -837,7 +826,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 9, 'italic')
         ).grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
-        # Max context tokens
         tk.Label(memory_section, text="Max Context Tokens:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
@@ -863,7 +851,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 9, 'italic')
         ).grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Conversation reset option
         tk.Label(memory_section, text="Auto-Reset Conversation:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
@@ -881,7 +868,6 @@ TWITCH_OAUTH_TOKEN=
         )
         auto_reset_check.grid(row=4, column=1, sticky='w', pady=5)
 
-        # Manual reset button
         reset_btn = tk.Button(
             memory_section,
             text="🔄 Clear Conversation History Now",
@@ -894,8 +880,9 @@ TWITCH_OAUTH_TOKEN=
         )
         reset_btn.grid(row=5, column=0, columnspan=2, pady=10)
 
-        # Personality section integrated into Setup tab
         personality_section = self.create_section(scrollable, "AI Personality", 3)
+        personality_section.grid_columnconfigure(0, weight=1)
+        personality_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(personality_section, text="System Prompt / Personality:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
@@ -928,8 +915,9 @@ TWITCH_OAUTH_TOKEN=
         )
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
-        # Test AI Connection section
         test_section = self.create_section(scrollable, "Test AI Connection", 4)
+        test_section.grid_columnconfigure(0, weight=1)
+        test_section.grid_columnconfigure(1, weight=1)
 
         test_info = tk.Label(
             test_section,
@@ -966,13 +954,11 @@ TWITCH_OAUTH_TOKEN=
         )
         self.test_status_label.grid(row=1, column=1, sticky='w', padx=10)
 
-    # NEW: Helper methods for response length UI
     def on_response_length_change(self):
         """Handle response length selection change"""
         length = self.response_length_var.get()
         self.update_config('response_length', length)
 
-        # Update description
         length_descriptions = {
             'brief': '1-2 sentences (~20-40 words) - Perfect for quick chats',
             'normal': '2-4 sentences (~40-80 words) - Balanced responses',
@@ -981,7 +967,6 @@ TWITCH_OAUTH_TOKEN=
         }
         self.length_desc_label.config(text=length_descriptions[length])
 
-        # Show/hide custom tokens
         self.update_custom_tokens_visibility()
 
     def update_custom_tokens_visibility(self):
@@ -1002,20 +987,35 @@ TWITCH_OAUTH_TOKEN=
         style_descriptions = {
             'casual': 'Relaxed, friendly tone with contractions',
             'conversational': 'Warm, natural conversation style',
-            'professional': 'Formal, polished language'
+            'professional': 'Formal, polished language',
+            'custom': 'Define your own custom style below'
         }
-        self.style_desc_label.config(text=style_descriptions[style])
+        self.style_desc_label.config(text=style_descriptions.get(style, ''))
+
+    def on_response_style_change(self):
+        """Handle response style selection change"""
+        style = self.response_style_var.get()
         self.update_config('response_style', style)
+        self.update_style_description()
+        self.update_custom_style_visibility()
+
+    def update_custom_style_visibility(self):
+        """Show or hide custom style text box based on selection"""
+        if self.response_style_var.get() == 'custom':
+            self.custom_style_frame.grid()
+        else:
+            self.custom_style_frame.grid_remove()
 
     def create_tts_tab(self, notebook):
         """TTS tab with dynamic voice dropdown and voice testing"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='🔊 TTS')
 
-        # Use scrollable frame
         scrollable = self.create_scrollable_frame(tab)
 
         tts_frame = self.create_section(scrollable, "TTS Service", 0)
+        tts_frame.grid_columnconfigure(0, weight=1)
+        tts_frame.grid_columnconfigure(1, weight=1)
 
         tk.Label(tts_frame, text="TTS Service:",
                 bg=self.colors['bg'], fg=self.colors['fg'],
@@ -1028,8 +1028,9 @@ TWITCH_OAUTH_TOKEN=
         tts_menu.grid(row=0, column=1, sticky='w', pady=5)
         tts_menu.bind('<<ComboboxSelected>>', self.on_tts_change)
 
-        # Voice selection (dynamic dropdown)
         voice_section = self.create_section(scrollable, "Voice Settings", 1)
+        voice_section.grid_columnconfigure(0, weight=1)
+        voice_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(voice_section, text="Voice:",
                 bg=self.colors['bg'], fg=self.colors['fg'],
@@ -1043,7 +1044,6 @@ TWITCH_OAUTH_TOKEN=
         self.voice_menu.bind('<<ComboboxSelected>>',
                             lambda e: self.update_config('elevenlabs_voice', self.voice_var.get()))
 
-        # Refresh voices button for ElevenLabs
         self.refresh_voices_btn = tk.Button(
             voice_section,
             text="🔄 Refresh Voices",
@@ -1056,7 +1056,6 @@ TWITCH_OAUTH_TOKEN=
         )
         self.refresh_voices_btn.grid(row=0, column=2, padx=5)
 
-        # Info label
         self.voice_info_label = tk.Label(
             voice_section,
             text="Click 'Refresh Voices' to load your custom ElevenLabs voices",
@@ -1066,10 +1065,9 @@ TWITCH_OAUTH_TOKEN=
         )
         self.voice_info_label.grid(row=1, column=0, columnspan=3, sticky='w', pady=5)
 
-        # ElevenLabs Advanced Settings (only show when ElevenLabs is selected)
         self.elevenlabs_settings_section = self.create_section(scrollable, "ElevenLabs Voice Settings", 2)
 
-        # Stability slider
+
         tk.Label(
             self.elevenlabs_settings_section,
             text="Stability:",
@@ -1102,7 +1100,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 8, 'italic')
         ).grid(row=0, column=2, sticky='w', padx=5)
 
-        # Similarity Boost slider
         tk.Label(
             self.elevenlabs_settings_section,
             text="Similarity Boost:",
@@ -1135,7 +1132,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 8, 'italic')
         ).grid(row=1, column=2, sticky='w', padx=5)
 
-        # Style slider
         tk.Label(
             self.elevenlabs_settings_section,
             text="Style Exaggeration:",
@@ -1168,7 +1164,6 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 8, 'italic')
         ).grid(row=2, column=2, sticky='w', padx=5)
 
-        # Speaker boost checkbox
         self.speaker_boost_var = tk.BooleanVar(value=self.config.get('elevenlabs_speaker_boost', True))
         speaker_boost_check = tk.Checkbutton(
             self.elevenlabs_settings_section,
@@ -1182,8 +1177,9 @@ TWITCH_OAUTH_TOKEN=
         )
         speaker_boost_check.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
 
-        # Test Voice section
         test_voice_section = self.create_section(scrollable, "Test Voice", 3)
+        test_voice_section.grid_columnconfigure(0, weight=1)
+        test_voice_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(
             test_voice_section,
@@ -1215,19 +1211,18 @@ TWITCH_OAUTH_TOKEN=
         )
         self.test_voice_label.grid(row=1, column=1, sticky='w', padx=10)
 
-        # Now update voice dropdown (after all sections created)
         self.update_voice_dropdown()
 
     def create_inputs_tab(self, notebook):
-        """Inputs tab with microphone, screenshot, and ENHANCED Twitch settings - UPDATED"""
+        """Inputs tab with microphone, screenshot, and ENHANCED Twitch settings"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='🎤 Inputs')
 
-        # Use scrollable frame
         scrollable = self.create_scrollable_frame(tab)
 
-        # Microphone section
         mic_section = self.create_section(scrollable, "Microphone Settings", 0)
+        mic_section.grid_columnconfigure(0, weight=1)
+        mic_section.grid_columnconfigure(1, weight=1)
 
         self.mic_var = tk.BooleanVar(value=self.config['mic_enabled'])
         mic_check = tk.Checkbutton(
@@ -1242,7 +1237,6 @@ TWITCH_OAUTH_TOKEN=
         )
         mic_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Microphone device selection
         tk.Label(mic_section, text="Microphone Device:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
@@ -1252,7 +1246,6 @@ TWITCH_OAUTH_TOKEN=
                                             state='readonly', width=35)
         self.mic_device_menu.grid(row=1, column=1, sticky='w', pady=5)
 
-        # Populate microphone list
         self.refresh_microphone_list()
 
         refresh_btn = tk.Button(
@@ -1267,7 +1260,6 @@ TWITCH_OAUTH_TOKEN=
         )
         refresh_btn.grid(row=1, column=2, padx=5)
 
-        # Recording mode
         tk.Label(mic_section, text="Recording Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
@@ -1281,8 +1273,9 @@ TWITCH_OAUTH_TOKEN=
         )
         mode_label.grid(row=2, column=1, sticky='w', pady=5)
 
-        # Screen capture
         screen_section = self.create_section(scrollable, "Screen Capture (Vision)", 1)
+        screen_section.grid_columnconfigure(0, weight=1)
+        screen_section.grid_columnconfigure(1, weight=1)
 
         self.screen_var = tk.BooleanVar(value=self.config['screen_enabled'])
         screen_check = tk.Checkbutton(
@@ -1297,7 +1290,6 @@ TWITCH_OAUTH_TOKEN=
         )
         screen_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Test screenshot button
         test_screenshot_btn = tk.Button(
             screen_section,
             text="📸 Test Screenshot Capture",
@@ -1320,10 +1312,10 @@ TWITCH_OAUTH_TOKEN=
         )
         self.test_screenshot_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
 
-        # UPDATED: Enhanced Twitch Integration
         twitch_section = self.create_section(scrollable, "Twitch Chat Integration", 2)
+        twitch_section.grid_columnconfigure(0, weight=1)
+        twitch_section.grid_columnconfigure(1, weight=1)
 
-        # Enable checkbox
         self.twitch_var = tk.BooleanVar(value=self.config['twitch_enabled'])
         twitch_check = tk.Checkbutton(
             twitch_section,
@@ -1337,18 +1329,25 @@ TWITCH_OAUTH_TOKEN=
         )
         twitch_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Channel name
         self.twitch_entry = self.create_entry(twitch_section, "Channel Name:", 'twitch_channel', 1)
 
-        # NEW: Read Username Setting
-        tk.Label(twitch_section, text="Include Username:",
+        # AI Context Settings
+        tk.Label(
+            twitch_section,
+            text="━━━ AI Context Settings ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 10, 'bold')
+        ).grid(row=2, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
+        tk.Label(twitch_section, text="Include Username in AI Prompt:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+                 font=('Arial', 10)).grid(row=3, column=0, sticky='w', pady=5)
 
         self.twitch_read_username_var = tk.BooleanVar(value=self.config.get('twitch_read_username', True))
         username_check = tk.Checkbutton(
             twitch_section,
-            text='Read "Username says: message" to AI',
+            text='Send "Username says: message" to AI',
             variable=self.twitch_read_username_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
@@ -1356,12 +1355,84 @@ TWITCH_OAUTH_TOKEN=
             selectcolor=self.colors['accent'],
             command=lambda: self.update_config('twitch_read_username', self.twitch_read_username_var.get())
         )
-        username_check.grid(row=2, column=1, sticky='w', pady=5)
+        username_check.grid(row=3, column=1, sticky='w', pady=5)
 
-        # NEW: Response Mode
+        # NEW: TTS Output Settings
+        tk.Label(
+            twitch_section,
+            text="━━━ TTS Output Settings ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 10, 'bold')
+        ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
+        tk.Label(
+            twitch_section,
+            text="Control what the bot actually SAYS out loud when responding:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9, 'italic')
+        ).grid(row=5, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # NEW: Speak Username checkbox
+        tk.Label(twitch_section, text="Speak Username:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=6, column=0, sticky='w', pady=5)
+
+        self.twitch_speak_username_var = tk.BooleanVar(value=self.config.get('twitch_speak_username', True))
+        speak_username_check = tk.Checkbutton(
+            twitch_section,
+            text='TTS says the username before responding',
+            variable=self.twitch_speak_username_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9),
+            selectcolor=self.colors['accent'],
+            command=lambda: self.update_config('twitch_speak_username', self.twitch_speak_username_var.get())
+        )
+        speak_username_check.grid(row=6, column=1, sticky='w', pady=5)
+
+        # NEW: Speak Message checkbox
+        tk.Label(twitch_section, text="Speak Message:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=7, column=0, sticky='w', pady=5)
+
+        self.twitch_speak_message_var = tk.BooleanVar(value=self.config.get('twitch_speak_message', True))
+        speak_message_check = tk.Checkbutton(
+            twitch_section,
+            text='TTS says the user\'s message before responding',
+            variable=self.twitch_speak_message_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9),
+            selectcolor=self.colors['accent'],
+            command=lambda: self.update_config('twitch_speak_message', self.twitch_speak_message_var.get())
+        )
+        speak_message_check.grid(row=7, column=1, sticky='w', pady=5)
+
+        # Example output
+        tk.Label(
+            twitch_section,
+            text='Example: When both checked, TTS will say "Username said: their message. [AI\'s response]"',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 8, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).grid(row=8, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # Response Mode Settings
+        tk.Label(
+            twitch_section,
+            text="━━━ Response Mode ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 10, 'bold')
+        ).grid(row=9, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
         tk.Label(twitch_section, text="Response Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=3, column=0, sticky='w', pady=5)
+                 font=('Arial', 10)).grid(row=10, column=0, sticky='w', pady=5)
 
         self.twitch_response_mode_var = tk.StringVar(value=self.config.get('twitch_response_mode', 'all'))
         response_modes = ['all', 'keywords', 'random', 'disabled']
@@ -1372,11 +1443,10 @@ TWITCH_OAUTH_TOKEN=
             state='readonly',
             width=15
         )
-        twitch_mode_menu.grid(row=3, column=1, sticky='w', pady=5)
+        twitch_mode_menu.grid(row=10, column=1, sticky='w', pady=5)
         twitch_mode_menu.bind('<<ComboboxSelected>>',
                               lambda e: self.on_twitch_mode_change())
 
-        # Mode descriptions
         mode_descriptions = {
             'all': 'Respond to every message (use with cooldown!)',
             'keywords': 'Only respond to messages with specific keywords',
@@ -1393,11 +1463,10 @@ TWITCH_OAUTH_TOKEN=
             wraplength=400,
             justify='left'
         )
-        self.twitch_mode_desc.grid(row=4, column=0, columnspan=2, sticky='w', pady=5)
+        self.twitch_mode_desc.grid(row=11, column=0, columnspan=2, sticky='w', pady=5)
 
-        # NEW: Keywords (shown when mode is 'keywords')
         self.twitch_keywords_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        self.twitch_keywords_frame.grid(row=5, column=0, columnspan=2, sticky='ew', pady=5)
+        self.twitch_keywords_frame.grid(row=12, column=0, columnspan=2, sticky='ew', pady=5)
 
         tk.Label(
             self.twitch_keywords_frame,
@@ -1419,17 +1488,8 @@ TWITCH_OAUTH_TOKEN=
                                         lambda e: self.update_config('twitch_keywords',
                                                                      self.twitch_keywords_entry.get()))
 
-        tk.Label(
-            self.twitch_keywords_frame,
-            text='e.g., "!ai, !bot, hey chat"',
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
-        ).pack(side='left', padx=5)
-
-        # NEW: Response Chance (shown when mode is 'random')
         self.twitch_chance_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        self.twitch_chance_frame.grid(row=6, column=0, columnspan=2, sticky='w', pady=5)
+        self.twitch_chance_frame.grid(row=13, column=0, columnspan=2, sticky='w', pady=5)
 
         tk.Label(
             self.twitch_chance_frame,
@@ -1465,13 +1525,12 @@ TWITCH_OAUTH_TOKEN=
 
         chance_slider.config(command=lambda v: self.update_chance_label(int(float(v))))
 
-        # NEW: Cooldown Setting
         tk.Label(twitch_section, text="Response Cooldown:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=7, column=0, sticky='w', pady=5)
+                 font=('Arial', 10)).grid(row=14, column=0, sticky='w', pady=5)
 
         cooldown_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        cooldown_frame.grid(row=7, column=1, sticky='w', pady=5)
+        cooldown_frame.grid(row=14, column=1, sticky='w', pady=5)
 
         self.twitch_cooldown_var = tk.IntVar(value=self.config.get('twitch_cooldown', 5))
         cooldown_slider = tk.Scale(
@@ -1507,18 +1566,15 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 9, 'italic'),
             wraplength=500,
             justify='left'
-        ).grid(row=8, column=0, columnspan=2, sticky='w', pady=5)
+        ).grid(row=15, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Update visibility based on current mode
         self.update_twitch_mode_visibility()
 
-    # NEW: Helper methods for Twitch UI
     def on_twitch_mode_change(self):
         """Handle Twitch response mode change"""
         mode = self.twitch_response_mode_var.get()
         self.update_config('twitch_response_mode', mode)
 
-        # Update description
         mode_descriptions = {
             'all': 'Respond to every message (use with cooldown!)',
             'keywords': 'Only respond to messages with specific keywords',
@@ -1527,20 +1583,17 @@ TWITCH_OAUTH_TOKEN=
         }
         self.twitch_mode_desc.config(text=mode_descriptions[mode])
 
-        # Update visibility
         self.update_twitch_mode_visibility()
 
     def update_twitch_mode_visibility(self):
         """Show/hide Twitch settings based on mode"""
         mode = self.twitch_response_mode_var.get()
 
-        # Show keywords only in 'keywords' mode
         if mode == 'keywords':
             self.twitch_keywords_frame.grid()
         else:
             self.twitch_keywords_frame.grid_remove()
 
-        # Show chance slider only in 'random' mode
         if mode == 'random':
             self.twitch_chance_frame.grid()
         else:
@@ -1561,10 +1614,8 @@ TWITCH_OAUTH_TOKEN=
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='🖼️ Avatar')
 
-        # Use scrollable frame
         scrollable = self.create_scrollable_frame(tab)
 
-        # Instructions with better formatting
         info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
         info_frame.pack(fill='x', padx=40, pady=25)
 
@@ -1578,11 +1629,6 @@ The avatar is an animated PNG image that appears on screen while the AI is activ
 
 These images will automatically switch during conversation.
 Perfect for streaming overlays in OBS!
-
-💡 Tips:
-  - Use transparent PNG files for best results
-  - Recommended size: 200x200 to 500x500 pixels
-  - Images appear in bottom-right corner of screen
         """
 
         tk.Label(
@@ -1594,10 +1640,10 @@ Perfect for streaming overlays in OBS!
             justify='left'
         ).pack(padx=30, pady=20)
 
-        # Image selection with cleaner layout
         images_section = self.create_section(scrollable, "Select Avatar Images", 0)
+        images_section.grid_columnconfigure(0, weight=1)
+        images_section.grid_columnconfigure(1, weight=1)
 
-        # Speaking image row
         speaking_frame = tk.Frame(images_section, bg=self.colors['bg'])
         speaking_frame.pack(fill='x', pady=10)
 
@@ -1638,7 +1684,6 @@ Perfect for streaming overlays in OBS!
             pady=5
         ).pack(side='left', padx=5)
 
-        # Idle image row
         idle_frame = tk.Frame(images_section, bg=self.colors['bg'])
         idle_frame.pack(fill='x', pady=10)
 
@@ -1679,8 +1724,9 @@ Perfect for streaming overlays in OBS!
             pady=5
         ).pack(side='left', padx=5)
 
-        # Preview area - centered
         preview_section = self.create_section(scrollable, "Preview", 1)
+        preview_section.grid_columnconfigure(0, weight=1)
+        preview_section.grid_columnconfigure(1, weight=1)
 
         preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
         preview_container.pack(expand=True)
@@ -1699,18 +1745,15 @@ Perfect for streaming overlays in OBS!
             relief='flat'
         )
         self.preview_label.pack(padx=3, pady=3)
-
+        self.load_existing_avatar_previews()
     def create_control_panel(self, parent):
         """Create bottom control panel - always visible"""
-        # Create panel with fixed height
         panel = tk.Frame(parent, bg=self.colors['accent'])
         panel.pack(fill='x', side='bottom')
 
-        # Inner container for proper spacing
         inner = tk.Frame(panel, bg=self.colors['accent'])
         inner.pack(fill='x', padx=20, pady=15)
 
-        # Left side - Status
         left_frame = tk.Frame(inner, bg=self.colors['accent'])
         left_frame.pack(side='left')
 
@@ -1732,7 +1775,6 @@ Perfect for streaming overlays in OBS!
         )
         self.recording_label.pack(anchor='w')
 
-        # Center - Screenshot button
         center_frame = tk.Frame(inner, bg=self.colors['accent'])
         center_frame.pack(side='left', padx=40)
 
@@ -1751,15 +1793,12 @@ Perfect for streaming overlays in OBS!
         )
         self.screenshot_btn.pack()
 
-        # Right side - Main controls
         right_frame = tk.Frame(inner, bg=self.colors['accent'])
         right_frame.pack(side='right')
 
-        # Buttons in a row
         buttons_frame = tk.Frame(right_frame, bg=self.colors['accent'])
         buttons_frame.pack()
 
-        # Save button with rounded style
         save_btn = tk.Button(
             buttons_frame,
             text="💾 Save Settings",
@@ -1775,7 +1814,6 @@ Perfect for streaming overlays in OBS!
         )
         save_btn.pack(side='left', padx=5)
 
-        # Start button with rounded style
         self.start_btn = tk.Button(
             buttons_frame,
             text="▶️ Start Chatbot",
@@ -1793,15 +1831,12 @@ Perfect for streaming overlays in OBS!
 
     def create_section(self, parent, title, row):
         """Create labeled section with centered content"""
-        # Outer container - centers the section
         outer = tk.Frame(parent, bg=self.colors['bg'])
         outer.pack(fill='x', padx=30, pady=15)
 
-        # Inner section - will be centered
         section = tk.Frame(outer, bg=self.colors['bg'])
         section.pack(anchor='center')  # Center the section
 
-        # Title with separator line
         title_frame = tk.Frame(section, bg=self.colors['bg'])
         title_frame.pack(fill='x', pady=(0, 10))
 
@@ -1810,45 +1845,37 @@ Perfect for streaming overlays in OBS!
             text=title,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 12, 'bold')
-        ).pack(anchor='center')  # Center title
+            font=self.ui_font_bold  # Use custom font
+        ).pack(anchor='center')
 
-        # Separator line
         separator = tk.Frame(title_frame, bg=self.colors['accent'], height=2)
         separator.pack(fill='x', pady=(5, 0))
 
-        # Content frame with padding
         frame = tk.Frame(section, bg=self.colors['bg'])
-        frame.pack(fill='x', padx=10)
+        frame.pack(fill='both', padx=10)  # Changed from fill='x' to fill='both'
 
         return frame
 
-    def create_rounded_button(self, parent, text, command, bg_color, **kwargs):
-        """Create a button with rounded appearance"""
-        return tk.Button(
-            parent,
-            text=text,
-            command=command,
-            bg=bg_color,
-            fg='white',
-            relief='raised',  # Gives a rounded effect
-            borderwidth=2,
-            cursor='hand2',
-            **kwargs
-        )
-
     def create_entry(self, parent, label, config_key, row):
-        """Create labeled entry"""
-        tk.Label(parent, text=label,
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 10)).grid(row=row, column=0, sticky='w', pady=5)
+        """Create labeled entry - centered with proper alignment"""
+        tk.Label(
+            parent,
+            text=label,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font
+        ).grid(row=row, column=0, sticky='e', pady=5, padx=(0, 10))  # Right-align labels
 
-        entry = tk.Entry(parent, bg=self.colors['entry_bg'],
-                        font=('Arial', 10), width=30)
-        entry.grid(row=row, column=1, sticky='w', pady=5, padx=10)
+        entry = tk.Entry(
+            parent,
+            bg=self.colors['entry_bg'],
+            font=self.ui_font,
+            width=30
+        )
+        entry.grid(row=row, column=1, sticky='w', pady=5, padx=(10, 0))  # Left-align entries
         entry.insert(0, self.config[config_key])
         entry.bind('<FocusOut>',
-                  lambda e, key=config_key: self.update_config(key, entry.get()))
+                   lambda e, key=config_key: self.update_config(key, entry.get()))
 
         return entry
 
@@ -1897,11 +1924,9 @@ Perfect for streaming overlays in OBS!
                 service = self.tts_var.get()
                 voice = self.voice_var.get()
 
-                # Extract voice ID if in "Name (id)" format
                 if '(' in voice and ')' in voice:
                     voice = voice.split('(')[1].split(')')[0]
 
-                # Get ElevenLabs settings if using ElevenLabs
                 elevenlabs_settings = None
                 if service == 'elevenlabs':
                     elevenlabs_settings = {
@@ -1911,10 +1936,8 @@ Perfect for streaming overlays in OBS!
                         'use_speaker_boost': self.config.get('elevenlabs_speaker_boost', True)
                     }
 
-                # Create TTS instance
                 tts = TTSManager(service=service, voice=voice, elevenlabs_settings=elevenlabs_settings)
 
-                # Test message
                 test_message = f"Hello! This is a test of the {service} voice. How do I sound?"
 
                 self.test_voice_label.config(
@@ -1922,7 +1945,6 @@ Perfect for streaming overlays in OBS!
                     fg='#FF9800'
                 )
 
-                # Speak
                 tts.speak(test_message)
 
                 self.test_voice_label.config(
@@ -1937,17 +1959,13 @@ Perfect for streaming overlays in OBS!
                 )
                 messagebox.showerror(
                     "Voice Test Failed",
-                    f"Failed to test voice:\n\n{e}\n\n"
-                    f"Make sure:\n"
-                    f"• API keys are configured (if needed)\n"
-                    f"• Audio output device is working\n"
-                    f"• Selected service is available"
+                    f"Failed to test voice:\n\n{e}"
                 )
 
         threading.Thread(target=test_thread, daemon=True).start()
 
     def test_screenshot(self):
-        """Test screenshot capture with AI response - FIXED to speak response"""
+        """Test screenshot capture with AI response"""
         self.test_screenshot_label.config(
             text="📸 Capturing screenshot and getting AI analysis...",
             fg=self.colors['fg']
@@ -1960,7 +1978,6 @@ Perfect for streaming overlays in OBS!
                 import os
                 from openai import OpenAI
 
-                # Check if API key exists
                 api_key = os.getenv('OPENAI_API_KEY')
                 if not api_key:
                     self.test_screenshot_label.config(
@@ -1973,7 +1990,6 @@ Perfect for streaming overlays in OBS!
                     )
                     return
 
-                # Verify model supports vision (EXACT match, not substring)
                 model = self.config['llm_model']
                 vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
 
@@ -1985,16 +2001,10 @@ Perfect for streaming overlays in OBS!
                     messagebox.showerror(
                         "Model Not Supported",
                         f"The selected model '{model}' doesn't support vision.\n\n"
-                        f"Please select a vision-capable model in ⚙️ Setup tab:\n"
-                        f"• gpt-4o (recommended)\n"
-                        f"• gpt-4o-mini\n"
-                        f"• gpt-4-turbo"
+                        f"Please select a vision-capable model in ⚙️ Setup tab."
                     )
                     return
 
-                print(f"[Test] Using model: {model}")
-
-                # Capture screenshot - BYPASS enabled check
                 screen = ScreenCaptureHandler()
                 image_data = screen.capture_screen()
 
@@ -2005,15 +2015,12 @@ Perfect for streaming overlays in OBS!
                     )
                     return
 
-                print(f"[Test] Screenshot captured")
-
                 self.test_screenshot_label.config(
                     text="✅ Screenshot captured! Analyzing...",
                     fg='#FF9800'
                 )
                 self.root.update()
 
-                # Create direct API call for testing
                 client = OpenAI(api_key=api_key)
 
                 response = client.chat.completions.create(
@@ -2039,9 +2046,7 @@ Perfect for streaming overlays in OBS!
                 )
 
                 ai_response = response.choices[0].message.content
-                print(f"[Test] AI Response: {ai_response[:100]}...")
 
-                # Check if AI actually saw the image
                 cant_see_phrases = ["can't see", "cannot see", "unable to see", "don't have access", "can't view"]
                 if any(phrase in ai_response.lower() for phrase in cant_see_phrases):
                     self.test_screenshot_label.config(
@@ -2050,36 +2055,25 @@ Perfect for streaming overlays in OBS!
                     )
                     messagebox.showwarning(
                         "Vision Not Working",
-                        f"Screenshot was captured and sent, but AI responded:\n\n"
-                        f"{ai_response[:200]}...\n\n"
-                        f"Possible issues:\n"
-                        f"• Image format not supported\n"
-                        f"• API limitations\n"
-                        f"• Try using gpt-4o instead"
+                        f"Screenshot was captured but AI couldn't see it."
                     )
                 else:
-                    # Success! Now SPEAK the response instead of showing popup
                     self.test_screenshot_label.config(
                         text="✅ Vision working! AI is responding...",
                         fg='#4CAF50'
                     )
 
-                    # Add to chat display
                     self.add_chat_message("System", "📸 Screenshot test - AI saw the image!")
                     self.add_chat_message("Vision AI", ai_response)
 
-                    # SPEAK the response using TTS if chatbot is running
                     if self.engine.is_running and self.engine.tts:
-                        print("[Test] Speaking response via TTS...")
                         self.engine._speak_response(ai_response)
                     else:
-                        print("[Test] Chatbot not running, skipping TTS")
                         self.add_chat_message("System", "💡 Start the chatbot to hear AI speak responses")
 
             except Exception as e:
                 import traceback
-                error_details = traceback.format_exc()
-                print(f"[Test] Error: {error_details}")
+                print(f"[Test] Error: {traceback.format_exc()}")
 
                 self.test_screenshot_label.config(
                     text=f"❌ Error: {str(e)[:50]}...",
@@ -2087,11 +2081,7 @@ Perfect for streaming overlays in OBS!
                 )
                 messagebox.showerror(
                     "Screenshot Test Failed",
-                    f"Failed to test screenshot:\n\n{str(e)}\n\n"
-                    f"Make sure:\n"
-                    f"• OpenAI API key is valid\n"
-                    f"• Using gpt-4o, gpt-4o-mini, or gpt-4-turbo\n"
-                    f"• You have credits in your account"
+                    f"Failed to test screenshot:\n\n{str(e)}"
                 )
 
         threading.Thread(target=test_thread, daemon=True).start()
@@ -2103,23 +2093,19 @@ Perfect for streaming overlays in OBS!
 
         self.voice_menu['values'] = voices
 
-        # Set to first option if current voice not in list
         current_voice = self.voice_var.get()
         if current_voice not in voices:
             self.voice_var.set(voices[0])
             self.update_config('elevenlabs_voice', voices[0])
 
-        # Show/hide refresh button and ElevenLabs settings based on service
         if service == 'elevenlabs':
             self.refresh_voices_btn.grid()
             self.voice_info_label.grid()
-            # Show ElevenLabs settings section
             for widget in self.elevenlabs_settings_section.winfo_children():
                 widget.grid()
         else:
             self.refresh_voices_btn.grid_remove()
             self.voice_info_label.grid_remove()
-            # Hide ElevenLabs settings section
             for widget in self.elevenlabs_settings_section.winfo_children():
                 widget.grid_remove()
 
@@ -2131,8 +2117,7 @@ Perfect for streaming overlays in OBS!
         if not api_key or api_key == 'your-elevenlabs-key-here':
             messagebox.showwarning(
                 "API Key Required",
-                "Please set your ELEVENLABS_API_KEY in the .env file first.\n\n"
-                "Get your API key from: https://elevenlabs.io/"
+                "Please set your ELEVENLABS_API_KEY in the .env file first."
             )
             return
 
@@ -2142,18 +2127,14 @@ Perfect for streaming overlays in OBS!
             self.voice_info_label.config(text="🔄 Fetching voices from ElevenLabs...")
             self.root.update()
 
-            # Initialize client and fetch voices
             client = ElevenLabs(api_key=api_key)
             voices_response = client.voices.get_all()
 
-            # Extract voice names/IDs
             custom_voices = []
             for voice in voices_response.voices:
-                # Add both name and voice_id
                 custom_voices.append(f"{voice.name} ({voice.voice_id})")
 
             if custom_voices:
-                # Combine default voices with custom voices
                 all_voices = self.voice_options['elevenlabs'] + ['---Custom Voices---'] + custom_voices
                 self.voice_options['elevenlabs'] = all_voices
                 self.voice_menu['values'] = all_voices
@@ -2161,19 +2142,15 @@ Perfect for streaming overlays in OBS!
                 self.voice_info_label.config(
                     text=f"✅ Loaded {len(custom_voices)} custom voice(s) from your account"
                 )
-                print(f"[App] Loaded {len(custom_voices)} ElevenLabs custom voices")
             else:
                 self.voice_info_label.config(text="No custom voices found in your account")
 
         except Exception as e:
-            error_msg = str(e)
             self.voice_info_label.config(text=f"❌ Error loading voices")
             messagebox.showerror(
                 "Error Loading Voices",
-                f"Failed to fetch ElevenLabs voices:\n\n{error_msg}\n\n"
-                "Check your API key and internet connection."
+                f"Failed to fetch ElevenLabs voices:\n\n{e}"
             )
-            print(f"[App] Error fetching ElevenLabs voices: {e}")
 
     def on_tts_change(self, event=None):
         """Handle TTS service change"""
@@ -2191,36 +2168,64 @@ Perfect for streaming overlays in OBS!
             config_key = f'{image_type}_image'
             self.update_config(config_key, filename)
 
-            # Update label with shortened path if too long
             display_path = filename
             if len(filename) > 60:
-                # Show filename and part of path
                 path_parts = filename.split('/')
                 if len(path_parts) > 1:
                     display_path = f".../{path_parts[-2]}/{path_parts[-1]}"
                 else:
                     display_path = f"...{filename[-57:]}"
 
-            # Update label
             if image_type == 'speaking':
                 self.speaking_path_label.config(text=display_path, fg=self.colors['fg'])
             else:
                 self.idle_path_label.config(text=display_path, fg=self.colors['fg'])
 
             # Show preview
-            try:
-                img = Image.open(filename)
-                # Resize to fit preview (max 300x300)
-                img.thumbnail((300, 300), Image.Resampling.LANCZOS)
-                photo = ImageTk.PhotoImage(img)
-                self.preview_label.config(image=photo, text="")
-                self.preview_label.image = photo  # Keep reference
-            except Exception as e:
-                print(f"[App] Error loading preview: {e}")
-                self.preview_label.config(
-                    text=f"✅ Image selected but preview failed\n\n{display_path}",
-                    fg=self.colors['fg']
-                )
+            self.update_avatar_preview(filename)
+
+    def update_avatar_preview(self, filename):
+        """Update the avatar preview with the selected image"""
+        try:
+            img = Image.open(filename)
+
+            # Resize to fit preview (max 400x400)
+            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+
+            # Create a neon green background if image has transparency
+            if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
+                # Create neon green background
+                background = Image.new('RGB', img.size, '#00FF00')  # Neon green
+
+                # Convert image to RGBA if needed
+                if img.mode != 'RGBA':
+                    img = img.convert('RGBA')
+
+                # Composite image over green background
+                background.paste(img, (0, 0), img)
+                img = background
+
+            # Convert to PhotoImage and display
+            photo = ImageTk.PhotoImage(img)
+            self.preview_label.config(image=photo, text="")
+            self.preview_label.image = photo  # Keep reference
+
+        except Exception as e:
+            print(f"[App] Error loading preview: {e}")
+            self.preview_label.config(
+                text=f"✅ Image selected but preview failed\n\n{filename}",
+                fg=self.colors['fg']
+            )
+
+    def load_existing_avatar_previews(self):
+        """Load preview of already configured images"""
+        # Check if speaking image exists and show preview
+        speaking_path = self.config.get('speaking_image', '')
+        if speaking_path and Path(speaking_path).exists():
+            self.update_avatar_preview(speaking_path)
+        # If only idle image exists, show that instead
+        elif self.config.get('idle_image', '') and Path(self.config.get('idle_image', '')).exists():
+            self.update_avatar_preview(self.config.get('idle_image', ''))
 
     def update_config(self, key, value):
         """Update configuration"""
@@ -2255,27 +2260,22 @@ Perfect for streaming overlays in OBS!
             self.status_label.config(text="🟢 Running")
             self.start_btn.config(text="⏸️ Stop Chatbot", bg='#f44336')
 
-            # Update chat mode
             self.chat_mode_label.config(
                 text="🎙️ Full Mode (voice, features, & inputs enabled)",
                 fg='#4CAF50'
             )
 
-            # Clear welcome message and show started message
             self.chat_display.config(state='normal')
             self.chat_display.delete('1.0', tk.END)
             self.chat_display.config(state='disabled')
 
-            # Setup push-to-talk
             self.setup_push_to_talk()
 
             self.add_chat_message("System", f"✅ {self.config['ai_name']} is now active!")
             self.add_chat_message("System", "🎤 Hold F4 to speak, release to send")
-            self.add_chat_message("System", "📸 Click 'Screenshot & Respond' to analyze your screen")
-            self.add_chat_message("System", "💬 Type messages here for text chat")
 
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to start:\n\n{e}\n\nCheck your API keys in the 🔑 API Keys tab")
+            messagebox.showerror("Error", f"Failed to start:\n\n{e}")
 
     def stop_chatbot(self):
         """Stop the chatbot"""
@@ -2285,7 +2285,6 @@ Perfect for streaming overlays in OBS!
         self.status_label.config(text="⚫ Stopped")
         self.start_btn.config(text="▶️ Start Chatbot", bg='#4CAF50')
 
-        # Update chat mode
         self.chat_mode_label.config(
             text="💬 Test Mode (responses only, no voice)",
             fg=self.colors['accent']
@@ -2298,9 +2297,7 @@ Perfect for streaming overlays in OBS!
         try:
             hotkey = self.config.get('hotkey_toggle', 'F4').lower()
 
-            # On press - start recording
             keyboard.on_press_key(hotkey, self.on_push_to_talk_press)
-            # On release - stop and process
             keyboard.on_release_key(hotkey, self.on_push_to_talk_release)
 
             self.hotkey_active = True
@@ -2329,20 +2326,17 @@ Perfect for streaming overlays in OBS!
 
         self.add_chat_message("System", "🎤 Listening...")
 
-        # Record while key is held
         import time
         start_time = time.time()
 
-        # Wait a bit for release or max time
         while self.is_recording and (time.time() - start_time) < 10:
             time.sleep(0.1)
 
-        # Process the recording
-        if time.time() - start_time > 0.5:  # Only process if held for >0.5s
+        if time.time() - start_time > 0.5:
             self.engine.process_microphone_input()
 
     def screenshot_and_respond(self):
-        """Take screenshot and get AI response - FIXED to bypass enabled check"""
+        """Take screenshot and get AI response"""
         if not self.engine.is_running:
             messagebox.showwarning("Not Running", "Please start the chatbot first!")
             return
@@ -2351,15 +2345,11 @@ Perfect for streaming overlays in OBS!
 
         def screenshot_thread():
             try:
-                # BYPASS the enabled check - direct capture
                 from input_handlers import ScreenCaptureHandler
                 screen_handler = ScreenCaptureHandler()
-                screen_data = screen_handler.capture_screen()  # Direct call, no enabled check
+                screen_data = screen_handler.capture_screen()
 
                 if screen_data:
-                    print(f"[Screenshot] Captured screen, data length: {len(screen_data)}")
-
-                    # Verify model supports vision
                     model = self.config['llm_model']
                     vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
 
@@ -2370,7 +2360,6 @@ Perfect for streaming overlays in OBS!
                         )
                         return
 
-                    # Ask AI about the screenshot
                     prompt = "What do you see in this screenshot? Describe it in detail."
                     self.engine._process_and_respond(prompt, screen_data)
                 else:
@@ -2383,7 +2372,7 @@ Perfect for streaming overlays in OBS!
 
         threading.Thread(target=screenshot_thread, daemon=True).start()
 
-    def remove_hotkeys(self):
+    def remove_hotkeys(self):  # UNINDENT - should be at class level
         """Remove all hotkeys"""
         if self.hotkey_active:
             try:
@@ -2401,19 +2390,20 @@ Perfect for streaming overlays in OBS!
         self.text_input.delete(0, tk.END)
         self.add_chat_message(self.config['user_name'], text)
 
-        # Check if chatbot is running
         if self.engine.is_running:
-            # Full chatbot mode - process normally with TTS
+            # Full chatbot mode - process normally
             def process_thread():
                 self.engine.process_text_input(text)
+
             threading.Thread(target=process_thread, daemon=True).start()
         else:
-            # Test mode - just get text response without TTS or full features
-            self.add_chat_message("System", "Test mode: Getting response without voice/features...")
+            # Test mode - get response with TTS
+            self.add_chat_message("System", "Test mode: Getting AI response with voice...")
 
             def test_thread():
                 try:
                     from llm_manager import LLMManager
+                    from tts_manager import TTSManager
 
                     # Create temporary LLM instance
                     system_prompt = self.config['personality']
@@ -2425,8 +2415,41 @@ Perfect for streaming overlays in OBS!
                         system_prompt=system_prompt
                     )
 
-                    response = llm.chat(text)
+                    # Get response length setting
+                    response_length = self.config.get('response_length', 'normal')
+                    if response_length == 'brief':
+                        max_tokens = 60
+                    elif response_length == 'normal':
+                        max_tokens = 150
+                    elif response_length == 'detailed':
+                        max_tokens = 300
+                    elif response_length == 'custom':
+                        max_tokens = self.config.get('max_response_tokens', 150)
+                    else:
+                        max_tokens = 150
+
+                    # Get AI response
+                    response = llm.chat(text, max_response_tokens=max_tokens)
                     self.display_response(response)
+
+                    # Speak response with TTS
+                    elevenlabs_settings = {
+                        'stability': self.config.get('elevenlabs_stability', 0.5),
+                        'similarity_boost': self.config.get('elevenlabs_similarity', 0.75),
+                        'style': self.config.get('elevenlabs_style', 0.0),
+                        'use_speaker_boost': self.config.get('elevenlabs_speaker_boost', True)
+                    }
+
+                    tts = TTSManager(
+                        service=self.config['tts_service'],
+                        voice=self.config['elevenlabs_voice'],
+                        elevenlabs_settings=elevenlabs_settings
+                    )
+
+                    # Speak the response
+                    self.add_chat_message("System", "🔊 Speaking response...")
+                    tts.speak(response)
+                    self.add_chat_message("System", "✅ Test complete!")
 
                 except Exception as e:
                     self.add_chat_message("Error", f"Failed to get response: {e}")
@@ -2437,68 +2460,48 @@ Perfect for streaming overlays in OBS!
     def show_welcome_message(self):
         """Show welcome message with setup instructions"""
         welcome_text = """
-╔══════════════════════════════════════════════════════════════════════════════╗
-║                    🎙️  Welcome to AI Chatbot System!                        ║
-╚══════════════════════════════════════════════════════════════════════════════╝
+    ╔══════════════════════════════════════════════════════════════════════════════╗
+    ║                    🎙️  Welcome to AI Chatbot System!                        ║
+    ╚══════════════════════════════════════════════════════════════════════════════╝
 
-Thank you for using the AI Chatbot System! Here's how to get started:
+    Thank you for using the AI Chatbot System! Here's how to get started:
 
-📋 QUICK SETUP CHECKLIST:
+    📋 QUICK SETUP CHECKLIST:
 
-  ✓ Step 1: Configure API Keys (🔑 API Keys tab)
-    • Add your OpenAI API key (REQUIRED)
-    • Optionally add ElevenLabs, Azure, or Twitch keys
-    • Click "Save All API Keys"
+      ✓ Step 1: Configure API Keys (🔑 API Keys tab)
+        • Add your OpenAI API key (REQUIRED)
+        • Optionally add ElevenLabs, Azure, or Twitch keys
+        • Click "Save All API Keys"
 
-  ✓ Step 2: Configure Your AI (⚙️ Setup tab)
-    • Give your AI a name and personality
-    • Choose your preferred GPT model
-    • Test the connection with the "Test AI Connection" button
+      ✓ Step 2: Configure Your AI (⚙️ Setup tab)
+        • Give your AI a name and personality
+        • Choose your preferred GPT model
+        • Test the connection with the "Test AI Connection" button
 
-  ✓ Step 3: Setup Text-to-Speech (🔊 TTS tab)
-    • Choose a TTS service (StreamElements is free!)
-    • Select a voice
-    • For ElevenLabs, click "Refresh Voices" to load your custom voices
+      ✓ Step 3: Setup Text-to-Speech (🔊 TTS tab)
+        • Choose a TTS service (StreamElements is free!)
+        • Select a voice
+        • For ElevenLabs, click "Refresh Voices" to load your custom voices
 
-  ✓ Step 4: Configure Inputs (🎤 Inputs tab)
-    • Enable microphone if you want voice chat
-    • Select your microphone device
-    • Enable Twitch chat if streaming
-    • Enable screen capture for vision features
+      ✓ Step 4: Configure Inputs (🎤 Inputs tab)
+        • Enable microphone if you want voice chat
+        • Enable Twitch chat if streaming
+        • NEW: Configure Twitch TTS output (speak username/message)
 
-  ✓ Step 5: (Optional) Setup Avatar (🖼️ Avatar tab)
-    • Add speaking and idle images for stream overlay
+      ✓ Step 5: Start Chatting!
+        • Click the "▶️ Start Chatbot" button at the bottom
+        • Or test responses right here in chat!
 
-  ✓ Step 6: Start Chatting!
-    • Click the "▶️ Start Chatbot" button at the bottom
-    • Or test responses right here in chat (no setup needed!)
+    ═══════════════════════════════════════════════════════════════════════════════
 
-═══════════════════════════════════════════════════════════════════════════════
+    Ready to begin? Start by adding your OpenAI API key in the 🔑 API Keys tab!
 
-💡 TIPS:
-
-• You can test AI responses right here in the chat ANYTIME - just type and press Enter!
-• Hold F4 to speak (push-to-talk) once the chatbot is started
-• Click "📸 Screenshot & Respond" to have the AI analyze your screen
-• StreamElements TTS is completely free and works without API keys
-
-🆘 NEED HELP?
-
-• Check README.md for detailed documentation
-• Run test_system.py to diagnose issues
-• Make sure OpenAI API key is configured first
-
-═══════════════════════════════════════════════════════════════════════════════
-
-Ready to begin? Start by adding your OpenAI API key in the 🔑 API Keys tab, or just
-type a message below to test the AI right now!
-
-"""
+    """
         self.chat_display.config(state='normal')
         self.chat_display.insert('1.0', welcome_text, 'welcome')
         self.chat_display.config(state='disabled')
 
-    def test_ai_connection(self):
+    def test_ai_connection(self):  # UNINDENT - should be at class level, NOT inside show_welcome_message
         """Test OpenAI API connection from Setup tab"""
         self.test_status_label.config(text="🔄 Testing connection...", fg=self.colors['fg'])
         self.root.update()
@@ -2508,7 +2511,6 @@ type a message below to test the AI right now!
                 from llm_manager import LLMManager
                 import os
 
-                # Check API key
                 api_key = os.getenv('OPENAI_API_KEY')
                 if not api_key or api_key == '':
                     self.test_status_label.config(
@@ -2517,7 +2519,6 @@ type a message below to test the AI right now!
                     )
                     return
 
-                # Test with simple message
                 llm = LLMManager(model=self.config['llm_model'], system_prompt="You are a helpful assistant.")
                 response = llm.chat("Say 'Connection successful!' and nothing else.")
 
@@ -2547,40 +2548,36 @@ type a message below to test the AI right now!
                 )
                 messagebox.showerror(
                     "Connection Failed",
-                    f"Failed to connect to OpenAI:\n\n{error_msg}\n\n"
-                    f"Common issues:\n"
-                    f"• API key not configured or invalid\n"
-                    f"• No credits in OpenAI account\n"
-                    f"• Network/firewall blocking connection\n"
-                    f"• Model name incorrect"
+                    f"Failed to connect to OpenAI:\n\n{error_msg}"
                 )
 
         threading.Thread(target=test_thread, daemon=True).start()
 
-    def display_response(self, response):
+    def display_response(self, response):  # UNINDENT - should be at class level
         """Display AI response in chat"""
         self.add_chat_message(self.config['ai_name'], response)
 
-    def add_chat_message(self, sender, message):
+    def add_chat_message(self, sender, message):  # UNINDENT - should be at class level
         """Add message to chat display"""
         self.chat_display.config(state='normal')
         self.chat_display.insert(tk.END, f"\n{sender}: {message}\n")
         self.chat_display.see(tk.END)
         self.chat_display.config(state='disabled')
 
-    def on_ai_speaking_start(self):
+    def on_ai_speaking_start(self):  # UNINDENT - should be at class level
         """Called when AI starts speaking"""
         self.status_label.config(text="🟢 Speaking...")
 
-    def on_ai_speaking_end(self):
+    def on_ai_speaking_end(self):  # UNINDENT - should be at class level
         """Called when AI finishes speaking"""
         self.status_label.config(text="🟢 Running")
 
 
-def main():
+def main():  # This should NOT be indented at all - it's outside the class
     root = tk.Tk()
     app = IntegratedChatbotApp(root)
     root.mainloop()
+
 
 if __name__ == '__main__':
     main()
