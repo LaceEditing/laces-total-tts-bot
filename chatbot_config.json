@@ -1,0 +1,16 @@
+{
+    "ai_name": "Buddy",
+    "user_name": "User",
+    "personality": "You are Buddy, a friendly and enthusiastic AI assistant. You love helping people and have a great sense of humor. Keep your responses concise and engaging.",
+    "llm_model": "gpt-4o",
+    "tts_service": "streamelements",
+    "elevenlabs_voice": "Brian",
+    "twitch_enabled": true,
+    "twitch_channel": "LaceEditing",
+    "mic_enabled": true,
+    "screen_enabled": true,
+    "hotkey_toggle": "F4",
+    "hotkey_stop": "P",
+    "speaking_image": "",
+    "idle_image": ""
+}

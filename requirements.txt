@@ -1,0 +1,28 @@
+# Core dependencies
+openai>=1.12.0
+elevenlabs>=0.2.27
+tiktoken>=0.5.2
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Speech recognition and audio
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.14
+pygame>=2.5.2
+
+# Image processing
+Pillow>=10.2.0
+
+# Keyboard control
+keyboard>=0.13.5
+
+# GUI (included with Python)
+# tkinter - comes with Python
+
+# Optional TTS engines
+azure-cognitiveservices-speech>=1.34.0  # Azure TTS
+coqui-tts  # Coqui TTS (open source)
+
+# HTTP requests
+requests>=2.31.0
