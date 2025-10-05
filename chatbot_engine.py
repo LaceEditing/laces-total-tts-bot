@@ -1,6 +1,7 @@
 ﻿"""
 Chatbot Engine - Main integration module
 Connects LLM, TTS, and Input handlers
+FIXED: Vision model checking and error handling
 """
 
 import json
@@ -245,21 +246,31 @@ class ChatbotEngine:
             self._process_and_respond(text)
 
     def _process_and_respond(self, user_input, image_data=None):
-        """Process input and generate response"""
+        """Process input and generate response - FIXED vision model checking"""
         if not self.is_running:
             return
 
         print(f"[Engine] Processing: {user_input[:100]}")
 
         try:
-            # Get LLM response
-            # Check if model supports vision
-            vision_models = ['gpt-5', 'gpt-5-mini', 'gpt-4.1', 'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-            supports_vision = any(model in self.config['llm_model'] for model in vision_models)
+            # FIXED: Use exact model matching for vision support
+            model = self.config['llm_model']
+            vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
+            supports_vision = model in vision_models  # EXACT match, not substring
+
+            print(f"[Engine] Model: {model}, Supports vision: {supports_vision}, Has image: {bool(image_data)}")
 
             if image_data and supports_vision:
+                print("[Engine] Using vision model with image")
                 response = self.llm.chat_with_vision(user_input, image_data)
+            elif image_data and not supports_vision:
+                # Warn if image provided but model doesn't support it
+                print(f"[Engine] WARNING: Model '{model}' doesn't support vision, using text-only")
+                response = self.llm.chat(user_input)
+                # Add note to response
+                response = f"[Note: I can't see images with {model}. Please use gpt-4o for vision.]\n\n" + response
             else:
+                print("[Engine] Using text-only mode")
                 response = self.llm.chat(user_input)
 
             print(f"[Engine] Response: {response[:100]}")
@@ -275,7 +286,14 @@ class ChatbotEngine:
             self.save_conversation_history()
 
         except Exception as e:
-            print(f"[Engine] Error processing input: {e}")
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"[Engine] Error processing input: {error_details}")
+
+            # Provide user-friendly error message
+            error_response = f"Sorry, I encountered an error: {str(e)}"
+            if self.on_response_callback:
+                self.on_response_callback(error_response)
 
     def _speak_response(self, text):
         """Convert response to speech"""

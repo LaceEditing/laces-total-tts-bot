@@ -1,6 +1,7 @@
 ﻿"""
 Complete AI Chatbot System - Integrated Application (IMPROVED)
 Enhanced with better UX, push-to-talk, and foolproof design
+FIXED: Screenshot functionality now works correctly
 """
 
 import tkinter as tk
@@ -727,7 +728,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             memory_section,
-            text="Higher = more memory but more expensive. GPT-5 supports up to 128K tokens.",
+            text="Higher = more memory but more expensive. GPT-4o supports up to 128K tokens.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
@@ -1142,7 +1143,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.test_screenshot_label = tk.Label(
             screen_section,
-            text="Takes a screenshot and shows you what the AI would see",
+            text="Takes a screenshot and has AI describe what it sees (spoken response)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
@@ -1558,7 +1559,7 @@ Perfect for streaming overlays in OBS!
         threading.Thread(target=test_thread, daemon=True).start()
 
     def test_screenshot(self):
-        """Test screenshot capture with AI response"""
+        """Test screenshot capture with AI response - FIXED to speak response"""
         self.test_screenshot_label.config(
             text="📸 Capturing screenshot and getting AI analysis...",
             fg=self.colors['fg']
@@ -1584,11 +1585,10 @@ Perfect for streaming overlays in OBS!
                     )
                     return
 
-                # Verify model supports vision
+                # Verify model supports vision (EXACT match, not substring)
                 model = self.config['llm_model']
                 vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
 
-                # Exact match for model name
                 if model not in vision_models:
                     self.test_screenshot_label.config(
                         text=f"❌ {model} doesn't support vision",
@@ -1600,14 +1600,13 @@ Perfect for streaming overlays in OBS!
                         f"Please select a vision-capable model in ⚙️ Setup tab:\n"
                         f"• gpt-4o (recommended)\n"
                         f"• gpt-4o-mini\n"
-                        f"• gpt-4-turbo\n\n"
-                        f"Note: GPT-5 models may not be available yet."
+                        f"• gpt-4-turbo"
                     )
                     return
 
                 print(f"[Test] Using model: {model}")
 
-                # Capture screenshot
+                # Capture screenshot - BYPASS enabled check
                 screen = ScreenCaptureHandler()
                 image_data = screen.capture_screen()
 
@@ -1618,18 +1617,16 @@ Perfect for streaming overlays in OBS!
                     )
                     return
 
-                print(f"[Test] Screenshot captured, data length: {len(image_data)}")
+                print(f"[Test] Screenshot captured")
 
                 self.test_screenshot_label.config(
-                    text="✅ Screenshot captured! Sending to AI for analysis...",
+                    text="✅ Screenshot captured! Analyzing...",
                     fg='#FF9800'
                 )
                 self.root.update()
 
                 # Create direct API call for testing
                 client = OpenAI(api_key=api_key)
-
-                print("[Test] Sending vision request to OpenAI...")
 
                 response = client.chat.completions.create(
                     model=model,
@@ -1666,26 +1663,30 @@ Perfect for streaming overlays in OBS!
                     messagebox.showwarning(
                         "Vision Not Working",
                         f"Screenshot was captured and sent, but AI responded:\n\n"
-                        f"{ai_response}\n\n"
+                        f"{ai_response[:200]}...\n\n"
                         f"Possible issues:\n"
                         f"• Image format not supported\n"
                         f"• API limitations\n"
                         f"• Try using gpt-4o instead"
                     )
                 else:
-                    # Success!
+                    # Success! Now SPEAK the response instead of showing popup
                     self.test_screenshot_label.config(
-                        text="✅ Screenshot test successful! Vision working!",
+                        text="✅ Vision working! AI is responding...",
                         fg='#4CAF50'
                     )
 
-                    messagebox.showinfo(
-                        "Screenshot Test - Success!",
-                        f"✅ Screenshot analyzed successfully!\n\n"
-                        f"AI Description:\n"
-                        f"{ai_response}\n\n"
-                        f"Vision is working correctly!"
-                    )
+                    # Add to chat display
+                    self.add_chat_message("System", "📸 Screenshot test - AI saw the image!")
+                    self.add_chat_message("Vision AI", ai_response)
+
+                    # SPEAK the response using TTS if chatbot is running
+                    if self.engine.is_running and self.engine.tts:
+                        print("[Test] Speaking response via TTS...")
+                        self.engine._speak_response(ai_response)
+                    else:
+                        print("[Test] Chatbot not running, skipping TTS")
+                        self.add_chat_message("System", "💡 Start the chatbot to hear AI speak responses")
 
             except Exception as e:
                 import traceback
@@ -1953,7 +1954,7 @@ Perfect for streaming overlays in OBS!
             self.engine.process_microphone_input()
 
     def screenshot_and_respond(self):
-        """Take screenshot and get AI response"""
+        """Take screenshot and get AI response - FIXED to bypass enabled check"""
         if not self.engine.is_running:
             messagebox.showwarning("Not Running", "Please start the chatbot first!")
             return
@@ -1962,17 +1963,34 @@ Perfect for streaming overlays in OBS!
 
         def screenshot_thread():
             try:
-                # Capture screen
-                screen_data = self.engine.inputs.capture_screen()
+                # BYPASS the enabled check - direct capture
+                from input_handlers import ScreenCaptureHandler
+                screen_handler = ScreenCaptureHandler()
+                screen_data = screen_handler.capture_screen()  # Direct call, no enabled check
 
                 if screen_data:
-                    # Ask AI about the screenshot with high priority
+                    print(f"[Screenshot] Captured screen, data length: {len(screen_data)}")
+
+                    # Verify model supports vision
+                    model = self.config['llm_model']
+                    vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
+
+                    if model not in vision_models:
+                        self.add_chat_message(
+                            "System",
+                            f"⚠️ Your model '{model}' doesn't support vision. Please switch to gpt-4o in Setup tab."
+                        )
+                        return
+
+                    # Ask AI about the screenshot
                     prompt = "What do you see in this screenshot? Describe it in detail."
                     self.engine._process_and_respond(prompt, screen_data)
                 else:
-                    self.add_chat_message("System", "Failed to capture screenshot")
+                    self.add_chat_message("System", "❌ Failed to capture screenshot")
 
             except Exception as e:
+                import traceback
+                print(f"[Screenshot] Error: {traceback.format_exc()}")
                 self.add_chat_message("System", f"Screenshot error: {e}")
 
         threading.Thread(target=screenshot_thread, daemon=True).start()
