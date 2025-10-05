@@ -778,7 +778,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             self.custom_style_frame,
-            text='Example: "Use humor when appropriate. Reference pop culture occasionally."',
+            text='Example: "Use humor when appropriate. Reference pop culture occasionally. Randomly start screaming in terror."',
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 8, 'italic')
@@ -788,7 +788,7 @@ TWITCH_OAUTH_TOKEN=
         self.update_custom_style_visibility()
 
         style_descriptions = {
-            'casual': 'Relaxed, friendly tone with contractions',
+            'casual': 'Relaxed, friendly tone with informal writing',
             'conversational': 'Warm, natural conversation style',
             'professional': 'Formal, polished language',
             'custom': 'Define your own custom style below'
@@ -803,16 +803,13 @@ TWITCH_OAUTH_TOKEN=
         )
         self.style_desc_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=5)
 
-        response_style_menu.bind('<<ComboboxSelected>>',
-                                 lambda e: self.update_style_description())
-
         memory_section = self.create_section(scrollable, "Memory & Context Settings", 2)
         memory_section.grid_columnconfigure(0, weight=1)
         memory_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(
             memory_section,
-            text="Configure how much the AI remembers from the conversation:",
+            text="Configure how much the bot remembers from the conversation:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             font=('Arial', 10)
@@ -820,7 +817,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             memory_section,
-            text="💾 Conversation history is auto-saved to: conversation_history.json",
+            text="Conversation history is automatically saved to: conversation_history.json",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
@@ -870,7 +867,7 @@ TWITCH_OAUTH_TOKEN=
 
         reset_btn = tk.Button(
             memory_section,
-            text="🔄 Clear Conversation History Now",
+            text="Clear Conversation History Now",
             command=self.clear_conversation_history,
             bg='#FF6B6B',
             fg='white',
@@ -880,7 +877,7 @@ TWITCH_OAUTH_TOKEN=
         )
         reset_btn.grid(row=5, column=0, columnspan=2, pady=10)
 
-        personality_section = self.create_section(scrollable, "AI Personality", 3)
+        personality_section = self.create_section(scrollable, "Bot's Personality", 3)
         personality_section.grid_columnconfigure(0, weight=1)
         personality_section.grid_columnconfigure(1, weight=1)
 
@@ -915,7 +912,7 @@ TWITCH_OAUTH_TOKEN=
         )
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
-        test_section = self.create_section(scrollable, "Test AI Connection", 4)
+        test_section = self.create_section(scrollable, "Test Bot's Connection", 4)
         test_section.grid_columnconfigure(0, weight=1)
         test_section.grid_columnconfigure(1, weight=1)
 
@@ -932,7 +929,7 @@ TWITCH_OAUTH_TOKEN=
 
         test_btn = tk.Button(
             test_section,
-            text="🧪 Test AI Connection",
+            text="Test Bot's Connection",
             command=self.test_ai_connection,
             bg='#2196F3',
             fg='white',
@@ -960,10 +957,10 @@ TWITCH_OAUTH_TOKEN=
         self.update_config('response_length', length)
 
         length_descriptions = {
-            'brief': '1-2 sentences (~20-40 words) - Perfect for quick chats',
+            'brief': '1-2 sentences (~20-40 words) - Good for quick chats',
             'normal': '2-4 sentences (~40-80 words) - Balanced responses',
             'detailed': '4-8 sentences (~80-150 words) - Thorough explanations',
-            'custom': 'Set your own token limit below'
+            'custom': 'Set your own token limit below (Probably not necessary tbh)'
         }
         self.length_desc_label.config(text=length_descriptions[length])
 
@@ -985,7 +982,7 @@ TWITCH_OAUTH_TOKEN=
         """Update response style description"""
         style = self.response_style_var.get()
         style_descriptions = {
-            'casual': 'Relaxed, friendly tone with contractions',
+            'casual': 'Relaxed, friendly tone with informal writing',
             'conversational': 'Warm, natural conversation style',
             'professional': 'Formal, polished language',
             'custom': 'Define your own custom style below'
@@ -1009,7 +1006,7 @@ TWITCH_OAUTH_TOKEN=
     def create_tts_tab(self, notebook):
         """TTS tab with dynamic voice dropdown and voice testing"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🔊 TTS')
+        notebook.add(tab, text='TTS')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1046,7 +1043,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.refresh_voices_btn = tk.Button(
             voice_section,
-            text="🔄 Refresh Voices",
+            text="Refresh Voices",
             command=self.refresh_elevenlabs_voices,
             bg=self.colors['button'],
             fg='white',
@@ -1191,7 +1188,7 @@ TWITCH_OAUTH_TOKEN=
 
         test_voice_btn = tk.Button(
             test_voice_section,
-            text="🔊 Test Voice",
+            text="Test Voice",
             command=self.test_voice,
             bg='#2196F3',
             fg='white',
@@ -1216,7 +1213,7 @@ TWITCH_OAUTH_TOKEN=
     def create_inputs_tab(self, notebook):
         """Inputs tab with microphone, screenshot, and ENHANCED Twitch settings"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🎤 Inputs')
+        notebook.add(tab, text='Inputs')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1227,7 +1224,7 @@ TWITCH_OAUTH_TOKEN=
         self.mic_var = tk.BooleanVar(value=self.config['mic_enabled'])
         mic_check = tk.Checkbutton(
             mic_section,
-            text="🎤 Enable Microphone Input",
+            text="Enable Microphone Input",
             variable=self.mic_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
@@ -1250,7 +1247,7 @@ TWITCH_OAUTH_TOKEN=
 
         refresh_btn = tk.Button(
             mic_section,
-            text="🔄 Refresh",
+            text="Refresh",
             command=self.refresh_microphone_list,
             bg=self.colors['button'],
             fg='white',
@@ -1266,7 +1263,7 @@ TWITCH_OAUTH_TOKEN=
 
         mode_label = tk.Label(
             mic_section,
-            text="Push-to-Talk (Hold F4 to speak)",
+            text="Push-to-Talk (Hold your selected hotkey to speak)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 10, 'italic')
@@ -1280,7 +1277,7 @@ TWITCH_OAUTH_TOKEN=
         self.screen_var = tk.BooleanVar(value=self.config['screen_enabled'])
         screen_check = tk.Checkbutton(
             screen_section,
-            text="🖥️ Enable Screen Capture (for vision responses)",
+            text="Enable Screen Capture (for vision responses)",
             variable=self.screen_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
@@ -1292,7 +1289,7 @@ TWITCH_OAUTH_TOKEN=
 
         test_screenshot_btn = tk.Button(
             screen_section,
-            text="📸 Test Screenshot Capture",
+            text="Test Screenshot Capture",
             command=self.test_screenshot,
             bg='#2196F3',
             fg='white',
@@ -1305,7 +1302,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.test_screenshot_label = tk.Label(
             screen_section,
-            text="Takes a screenshot and has AI describe what it sees (spoken response)",
+            text="Takes a screenshot and has the bot describe what it sees",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic')
@@ -1319,7 +1316,7 @@ TWITCH_OAUTH_TOKEN=
         self.twitch_var = tk.BooleanVar(value=self.config['twitch_enabled'])
         twitch_check = tk.Checkbutton(
             twitch_section,
-            text="💬 Enable Twitch Chat",
+            text="Enable Twitch Chat",
             variable=self.twitch_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
@@ -1334,20 +1331,20 @@ TWITCH_OAUTH_TOKEN=
         # AI Context Settings
         tk.Label(
             twitch_section,
-            text="━━━ AI Context Settings ━━━",
+            text="━━━ Context Settings ━━━",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 10, 'bold')
         ).grid(row=2, column=0, columnspan=2, sticky='w', pady=(15, 5))
 
-        tk.Label(twitch_section, text="Include Username in AI Prompt:",
+        tk.Label(twitch_section, text="Include Username in input:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=('Arial', 10)).grid(row=3, column=0, sticky='w', pady=5)
 
         self.twitch_read_username_var = tk.BooleanVar(value=self.config.get('twitch_read_username', True))
         username_check = tk.Checkbutton(
             twitch_section,
-            text='Send "Username says: message" to AI',
+            text='Send "Username says: message" to the bot',
             variable=self.twitch_read_username_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
@@ -1413,7 +1410,7 @@ TWITCH_OAUTH_TOKEN=
         # Example output
         tk.Label(
             twitch_section,
-            text='Example: When both checked, TTS will say "Username said: their message. [AI\'s response]"',
+            text='Example: When both checked, TTS will say "Username said: their message. [Bot\'s response]"',
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 8, 'italic'),
@@ -1448,7 +1445,7 @@ TWITCH_OAUTH_TOKEN=
                               lambda e: self.on_twitch_mode_change())
 
         mode_descriptions = {
-            'all': 'Respond to every message (use with cooldown!)',
+            'all': 'Respond to every message (use with cooldown)',
             'keywords': 'Only respond to messages with specific keywords',
             'random': 'Respond randomly based on chance percentage',
             'disabled': 'Read messages but never respond automatically'
@@ -1560,7 +1557,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             twitch_section,
-            text="💡 Cooldown prevents spam - set to 0 to respond immediately to every message",
+            text="Cooldown prevents spam - set to 0 to respond immediately to every message, which is probably a bad idea",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic'),
@@ -1612,7 +1609,7 @@ TWITCH_OAUTH_TOKEN=
     def create_avatar_tab(self, notebook):
         """Avatar images tab with preview"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🖼️ Avatar')
+        notebook.add(tab, text='Avatar')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1620,15 +1617,15 @@ TWITCH_OAUTH_TOKEN=
         info_frame.pack(fill='x', padx=40, pady=25)
 
         info_text = """
-📸 Avatar Setup Instructions
+Avatar Setup Instructions
 
-The avatar is an animated PNG image that appears on screen while the AI is active.
+The avatar is an animated PNG image that appears on screen while the bot is active.
 
 • SPEAKING IMAGE: Shown when AI is talking (e.g., open mouth, glowing, animated)
 • IDLE IMAGE: Shown when AI is silent (e.g., closed mouth, still, waiting)
 
 These images will automatically switch during conversation.
-Perfect for streaming overlays in OBS!
+This means you'll need to import the "current_avatar.png" image into OBS, and it will update automatically.
         """
 
         tk.Label(
@@ -1649,7 +1646,7 @@ Perfect for streaming overlays in OBS!
 
         tk.Label(
             speaking_frame,
-            text="🗣️ Speaking Image:",
+            text="Speaking Image:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             font=('Arial', 11, 'bold'),
@@ -1672,7 +1669,7 @@ Perfect for streaming overlays in OBS!
 
         tk.Button(
             speaking_frame,
-            text="📁 Browse",
+            text="Browse",
             command=lambda: self.browse_image('speaking'),
             bg=self.colors['button'],
             fg='white',
@@ -1689,7 +1686,7 @@ Perfect for streaming overlays in OBS!
 
         tk.Label(
             idle_frame,
-            text="😶 Idle Image:",
+            text="Idle Image:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             font=('Arial', 11, 'bold'),
@@ -1712,7 +1709,7 @@ Perfect for streaming overlays in OBS!
 
         tk.Button(
             idle_frame,
-            text="📁 Browse",
+            text="Browse",
             command=lambda: self.browse_image('idle'),
             bg=self.colors['button'],
             fg='white',
@@ -1780,7 +1777,7 @@ Perfect for streaming overlays in OBS!
 
         self.screenshot_btn = tk.Button(
             center_frame,
-            text="📸 Screenshot & Respond",
+            text="Screenshot & Respond",
             command=self.screenshot_and_respond,
             bg='#FF6B6B',
             fg='white',
@@ -1900,21 +1897,22 @@ Perfect for streaming overlays in OBS!
         result = messagebox.askyesno(
             "Clear Conversation History",
             "Are you sure you want to clear the conversation history?\n\n"
-            "This will reset the AI's memory of your conversation.\n"
+            "This will reset the bot's memory of your conversation.\n"
+            "Kinda like you're murdering it, violently.\n"
             "This action cannot be undone."
         )
 
         if result:
             if self.engine.is_running and self.engine.llm:
                 self.engine.llm.reset_conversation(self.config['personality'])
-                self.add_chat_message("System", "🔄 Conversation history cleared")
+                self.add_chat_message("System", "Conversation history cleared")
                 messagebox.showinfo("Success", "Conversation history has been cleared!")
             else:
                 messagebox.showinfo("Note", "Chatbot is not running. History will be cleared when you start it.")
 
     def test_voice(self):
         """Test the selected TTS voice"""
-        self.test_voice_label.config(text="🔊 Testing voice...", fg=self.colors['fg'])
+        self.test_voice_label.config(text="Testing voice...", fg=self.colors['fg'])
         self.root.update()
 
         def test_thread():
@@ -1938,17 +1936,17 @@ Perfect for streaming overlays in OBS!
 
                 tts = TTSManager(service=service, voice=voice, elevenlabs_settings=elevenlabs_settings)
 
-                test_message = f"Hello! This is a test of the {service} voice. How do I sound?"
+                test_message = f"Hello! This is a test of the {service} voice. Do you like me? Am I what you wanted?"
 
                 self.test_voice_label.config(
-                    text=f"🔊 Playing test message...",
+                    text=f"Playing test message...",
                     fg='#FF9800'
                 )
 
                 tts.speak(test_message)
 
                 self.test_voice_label.config(
-                    text=f"✅ Voice test complete!",
+                    text=f"Voice test complete!",
                     fg='#4CAF50'
                 )
 
@@ -1967,7 +1965,7 @@ Perfect for streaming overlays in OBS!
     def test_screenshot(self):
         """Test screenshot capture with AI response"""
         self.test_screenshot_label.config(
-            text="📸 Capturing screenshot and getting AI analysis...",
+            text="Capturing screenshot and getting AI analysis...",
             fg=self.colors['fg']
         )
         self.root.update()
@@ -1986,7 +1984,7 @@ Perfect for streaming overlays in OBS!
                     )
                     messagebox.showerror(
                         "API Key Required",
-                        "Please configure your OpenAI API key in the 🔑 API Keys tab first."
+                        "Please configure your OpenAI API key in the API Keys tab first."
                     )
                     return
 
@@ -2001,7 +1999,7 @@ Perfect for streaming overlays in OBS!
                     messagebox.showerror(
                         "Model Not Supported",
                         f"The selected model '{model}' doesn't support vision.\n\n"
-                        f"Please select a vision-capable model in ⚙️ Setup tab."
+                        f"Please select a vision-capable model in Setup tab."
                     )
                     return
 
@@ -2050,26 +2048,26 @@ Perfect for streaming overlays in OBS!
                 cant_see_phrases = ["can't see", "cannot see", "unable to see", "don't have access", "can't view"]
                 if any(phrase in ai_response.lower() for phrase in cant_see_phrases):
                     self.test_screenshot_label.config(
-                        text="⚠️ AI couldn't see the image",
+                        text="The bot couldn't see the image",
                         fg='#FF9800'
                     )
                     messagebox.showwarning(
                         "Vision Not Working",
-                        f"Screenshot was captured but AI couldn't see it."
+                        f"Screenshot was captured but the bot couldn't see it."
                     )
                 else:
                     self.test_screenshot_label.config(
-                        text="✅ Vision working! AI is responding...",
+                        text="Vision working! The bot is responding...",
                         fg='#4CAF50'
                     )
 
-                    self.add_chat_message("System", "📸 Screenshot test - AI saw the image!")
+                    self.add_chat_message("System", "Screenshot test - the bot saw the image!")
                     self.add_chat_message("Vision AI", ai_response)
 
                     if self.engine.is_running and self.engine.tts:
                         self.engine._speak_response(ai_response)
                     else:
-                        self.add_chat_message("System", "💡 Start the chatbot to hear AI speak responses")
+                        self.add_chat_message("System", "Start the chatbot to hear your bot speak its responses")
 
             except Exception as e:
                 import traceback
@@ -2124,7 +2122,7 @@ Perfect for streaming overlays in OBS!
         try:
             from elevenlabs.client import ElevenLabs
 
-            self.voice_info_label.config(text="🔄 Fetching voices from ElevenLabs...")
+            self.voice_info_label.config(text="Fetching voices from ElevenLabs...")
             self.root.update()
 
             client = ElevenLabs(api_key=api_key)
@@ -2140,7 +2138,7 @@ Perfect for streaming overlays in OBS!
                 self.voice_menu['values'] = all_voices
 
                 self.voice_info_label.config(
-                    text=f"✅ Loaded {len(custom_voices)} custom voice(s) from your account"
+                    text=f"Loaded {len(custom_voices)} custom voice(s) from your account"
                 )
             else:
                 self.voice_info_label.config(text="No custom voices found in your account")
@@ -2213,7 +2211,7 @@ Perfect for streaming overlays in OBS!
         except Exception as e:
             print(f"[App] Error loading preview: {e}")
             self.preview_label.config(
-                text=f"✅ Image selected but preview failed\n\n{filename}",
+                text=f"Image selected but preview failed\n\n{filename}",
                 fg=self.colors['fg']
             )
 
@@ -2261,7 +2259,7 @@ Perfect for streaming overlays in OBS!
             self.start_btn.config(text="⏸️ Stop Chatbot", bg='#f44336')
 
             self.chat_mode_label.config(
-                text="🎙️ Full Mode (voice, features, & inputs enabled)",
+                text="Full Mode (voice, features, & inputs enabled)",
                 fg='#4CAF50'
             )
 
@@ -2272,7 +2270,7 @@ Perfect for streaming overlays in OBS!
             self.setup_push_to_talk()
 
             self.add_chat_message("System", f"✅ {self.config['ai_name']} is now active!")
-            self.add_chat_message("System", "🎤 Hold F4 to speak, release to send")
+            self.add_chat_message("System", "Hold your mic hotkey to speak, release to send")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to start:\n\n{e}")
@@ -2286,11 +2284,11 @@ Perfect for streaming overlays in OBS!
         self.start_btn.config(text="▶️ Start Chatbot", bg='#4CAF50')
 
         self.chat_mode_label.config(
-            text="💬 Test Mode (responses only, no voice)",
+            text="Test Mode (responses only, no voice)",
             fg=self.colors['accent']
         )
 
-        self.add_chat_message("System", "⏸️ Chatbot stopped (test mode still available)")
+        self.add_chat_message("System", "Chatbot stopped (test mode still available)")
 
     def setup_push_to_talk(self):
         """Setup push-to-talk hotkey"""
@@ -2324,7 +2322,7 @@ Perfect for streaming overlays in OBS!
         if not self.engine.is_running or not self.is_recording:
             return
 
-        self.add_chat_message("System", "🎤 Listening...")
+        self.add_chat_message("System", "Listening...")
 
         import time
         start_time = time.time()
@@ -2341,7 +2339,7 @@ Perfect for streaming overlays in OBS!
             messagebox.showwarning("Not Running", "Please start the chatbot first!")
             return
 
-        self.add_chat_message("System", "📸 Taking screenshot...")
+        self.add_chat_message("System", "Taking screenshot...")
 
         def screenshot_thread():
             try:
@@ -2398,7 +2396,7 @@ Perfect for streaming overlays in OBS!
             threading.Thread(target=process_thread, daemon=True).start()
         else:
             # Test mode - get response with TTS
-            self.add_chat_message("System", "Test mode: Getting AI response with voice...")
+            self.add_chat_message("System", "Test mode: Getting response with voice...")
 
             def test_thread():
                 try:
@@ -2447,54 +2445,53 @@ Perfect for streaming overlays in OBS!
                     )
 
                     # Speak the response
-                    self.add_chat_message("System", "🔊 Speaking response...")
+                    self.add_chat_message("System", "Speaking response...")
                     tts.speak(response)
-                    self.add_chat_message("System", "✅ Test complete!")
+                    self.add_chat_message("System", "Test complete!")
 
                 except Exception as e:
                     self.add_chat_message("Error", f"Failed to get response: {e}")
-                    self.add_chat_message("System", "Make sure your OpenAI API key is configured in the 🔑 API Keys tab")
+                    self.add_chat_message("System", "Make sure your OpenAI API key is configured in the API Keys tab")
 
             threading.Thread(target=test_thread, daemon=True).start()
 
     def show_welcome_message(self):
         """Show welcome message with setup instructions"""
         welcome_text = """
-    ╔══════════════════════════════════════════════════════════════════════════════╗
-    ║                    🎙️  Welcome to AI Chatbot System!                        ║
-    ╚══════════════════════════════════════════════════════════════════════════════╝
+    Thank you for using my silly little software! Here's how to get started:
 
-    Thank you for using the AI Chatbot System! Here's how to get started:
+    QUICK SETUP CHECKLIST:
 
-    📋 QUICK SETUP CHECKLIST:
-
-      ✓ Step 1: Configure API Keys (🔑 API Keys tab)
+      ✓ Step 1: Configure API Keys (API Keys tab)
         • Add your OpenAI API key (REQUIRED)
         • Optionally add ElevenLabs, Azure, or Twitch keys
         • Click "Save All API Keys"
 
-      ✓ Step 2: Configure Your AI (⚙️ Setup tab)
-        • Give your AI a name and personality
-        • Choose your preferred GPT model
-        • Test the connection with the "Test AI Connection" button
+      ✓ Step 2: Configure Your Bot (Setup tab)
+        • Give your bot a name and personality
+        • Choose your preferred response model
+        • Test the connection with the test button
 
-      ✓ Step 3: Setup Text-to-Speech (🔊 TTS tab)
+      ✓ Step 3: Setup Text-to-Speech (TTS tab)
         • Choose a TTS service (StreamElements is free!)
         • Select a voice
         • For ElevenLabs, click "Refresh Voices" to load your custom voices
 
-      ✓ Step 4: Configure Inputs (🎤 Inputs tab)
+      ✓ Step 4: Configure Inputs (Inputs tab)
         • Enable microphone if you want voice chat
         • Enable Twitch chat if streaming
-        • NEW: Configure Twitch TTS output (speak username/message)
+        • Configure Twitch TTS output (speak username/message)
 
-      ✓ Step 5: Start Chatting!
-        • Click the "▶️ Start Chatbot" button at the bottom
-        • Or test responses right here in chat!
+      ✓ Step 5: Begin the Delusion!
+        • Click the "Start Chatbot" button at the bottom
+        • Or test responses right here in chat
+        • It's like talking to the real voices in your head
 
     ═══════════════════════════════════════════════════════════════════════════════
 
-    Ready to begin? Start by adding your OpenAI API key in the 🔑 API Keys tab!
+    Ready to begin? Start by adding your OpenAI API key in the API Keys tab!
+    
+    Fuck OpenAI and Elon btw, I'll have open source models soon.
 
     """
         self.chat_display.config(state='normal')
@@ -2503,7 +2500,7 @@ Perfect for streaming overlays in OBS!
 
     def test_ai_connection(self):  # UNINDENT - should be at class level, NOT inside show_welcome_message
         """Test OpenAI API connection from Setup tab"""
-        self.test_status_label.config(text="🔄 Testing connection...", fg=self.colors['fg'])
+        self.test_status_label.config(text="Testing connection...", fg=self.colors['fg'])
         self.root.update()
 
         def test_thread():
@@ -2514,7 +2511,7 @@ Perfect for streaming overlays in OBS!
                 api_key = os.getenv('OPENAI_API_KEY')
                 if not api_key or api_key == '':
                     self.test_status_label.config(
-                        text="❌ No OpenAI API key found! Add it in the 🔑 API Keys tab.",
+                        text="❌ No OpenAI API key found! Add it in the API Keys tab.",
                         fg='#f44336'
                     )
                     return
