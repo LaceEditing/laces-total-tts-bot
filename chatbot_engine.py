@@ -1,7 +1,5 @@
 ﻿"""
 Chatbot Engine - Main integration module
-Connects LLM, TTS, and Input handlers
-FIXED: Vision model checking and error handling
 """
 
 import json
@@ -41,6 +39,11 @@ class ChatbotEngine:
         self.is_speaking = False
         self.current_thread = None
 
+        # Twitch polling
+        self.twitch_thread = None
+        self.twitch_running = False
+        self.last_twitch_response_time = 0
+
         # Avatar images
         self.speaking_image = None
         self.idle_image = None
@@ -60,7 +63,7 @@ class ChatbotEngine:
             self.config = self._default_config()
 
     def _default_config(self):
-        """Return default configuration"""
+        """Return default configuration - UPDATED with new settings"""
         return {
             'ai_name': 'Assistant',
             'user_name': 'User',
@@ -79,7 +82,19 @@ class ChatbotEngine:
             'elevenlabs_stability': 0.5,
             'elevenlabs_similarity': 0.75,
             'elevenlabs_style': 0.0,
-            'elevenlabs_speaker_boost': True
+            'elevenlabs_speaker_boost': True,
+
+            # NEW: Response length settings
+            'response_length': 'normal',  # brief, normal, detailed, custom
+            'max_response_tokens': 150,  # Used when response_length is 'custom'
+            'response_style': 'conversational',  # conversational, professional, casual
+
+            # NEW: Twitch integration settings
+            'twitch_read_username': True,  # Include username in prompt
+            'twitch_response_mode': 'all',  # all, keywords, random, timed
+            'twitch_response_chance': 100,  # Percentage chance to respond (for random mode)
+            'twitch_cooldown': 5,  # Seconds between responses
+            'twitch_keywords': '!ai,!bot,!ask',  # Comma-separated keywords to trigger response
         }
 
     def save_conversation_history(self):
@@ -115,14 +130,45 @@ class ChatbotEngine:
                 print(f"[Engine] Error loading conversation history: {e}")
         return False
 
-    def initialize(self):
-        """Initialize all components with current config"""
-        # Build system prompt with personality
+    def _build_system_prompt(self):
+        """Build system prompt with personality and length instructions - NEW"""
         system_prompt = self.config['personality']
+
+        # Add AI name
         if self.config['ai_name'] != 'Assistant':
             system_prompt += f"\n\nYour name is {self.config['ai_name']}."
+
+        # Add user name
         if self.config['user_name'] != 'User':
             system_prompt += f"\nYou are talking to {self.config['user_name']}."
+
+        # Add response length instructions
+        response_length = self.config.get('response_length', 'normal')
+
+        if response_length == 'brief':
+            system_prompt += "\n\nIMPORTANT: Keep ALL responses very brief and concise - typically 1-2 sentences (20-40 words max). Be direct and to the point."
+        elif response_length == 'normal':
+            system_prompt += "\n\nKeep responses concise and engaging - typically 2-4 sentences (40-80 words). Avoid long paragraphs unless specifically asked."
+        elif response_length == 'detailed':
+            system_prompt += "\n\nProvide thorough, detailed responses with explanations and context when helpful. Aim for 4-8 sentences (80-150 words) for most answers."
+        # 'custom' uses max_response_tokens setting directly
+
+        # Add response style
+        response_style = self.config.get('response_style', 'conversational')
+
+        if response_style == 'casual':
+            system_prompt += "\n\nUse a casual, friendly tone. Feel free to use contractions and casual language."
+        elif response_style == 'professional':
+            system_prompt += "\n\nMaintain a professional, polished tone. Use proper grammar and formal language."
+        elif response_style == 'conversational':
+            system_prompt += "\n\nUse a warm, conversational tone that's friendly but clear."
+
+        return system_prompt
+
+    def initialize(self):
+        """Initialize all components with current config"""
+        # Build system prompt with all settings
+        system_prompt = self._build_system_prompt()
 
         # Initialize LLM
         self.llm = LLMManager(
@@ -174,20 +220,28 @@ class ChatbotEngine:
             print(f"[Engine] Error loading images: {e}")
 
     def start(self):
-        """Start the chatbot engine"""
+        """Start the chatbot engine - UPDATED with Twitch polling"""
         if not self.llm or not self.tts:
             self.initialize()
 
         self.is_running = True
         print(f"[Engine] {self.config['ai_name']} is now running!")
 
+        # Start Twitch polling if enabled
+        if self.config['twitch_enabled'] and self.inputs.twitch:
+            self.start_twitch_polling()
+
         # Show idle image
         if self.idle_image:
             self._show_image(self.idle_image)
 
     def stop(self):
-        """Stop the chatbot engine"""
+        """Stop the chatbot engine - UPDATED to stop Twitch polling"""
         self.is_running = False
+
+        # Stop Twitch polling
+        self.stop_twitch_polling()
+
         if self.inputs.twitch:
             self.inputs.disable_twitch()
 
@@ -199,6 +253,100 @@ class ChatbotEngine:
                 pass
 
         print("[Engine] Stopped")
+
+    def start_twitch_polling(self):
+        """Start polling Twitch chat for messages - NEW"""
+        if self.twitch_running:
+            return
+
+        self.twitch_running = True
+        self.twitch_thread = threading.Thread(target=self._twitch_poll_loop, daemon=True)
+        self.twitch_thread.start()
+        print("[Engine] Twitch polling started")
+
+    def stop_twitch_polling(self):
+        """Stop polling Twitch chat - NEW"""
+        self.twitch_running = False
+        if self.twitch_thread:
+            self.twitch_thread.join(timeout=2)
+        print("[Engine] Twitch polling stopped")
+
+    def _twitch_poll_loop(self):
+        """Poll Twitch chat for messages and respond based on settings - NEW"""
+        import random
+
+        while self.twitch_running and self.is_running:
+            try:
+                messages = self.inputs.get_twitch_messages()
+
+                for msg in messages:
+                    if not self.twitch_running:
+                        break
+
+                    username = msg['username']
+                    message = msg['message']
+
+                    # Check if we should respond to this message
+                    should_respond = self._should_respond_to_twitch(message)
+
+                    if should_respond:
+                        # Check cooldown
+                        current_time = time.time()
+                        cooldown = self.config.get('twitch_cooldown', 5)
+
+                        if current_time - self.last_twitch_response_time >= cooldown:
+                            # Format the input
+                            if self.config.get('twitch_read_username', True):
+                                user_input = f"{username} says: {message}"
+                            else:
+                                user_input = message
+
+                            print(f"[Engine] Responding to Twitch: {user_input}")
+
+                            # Process and respond
+                            self._process_and_respond(user_input)
+
+                            # Update last response time
+                            self.last_twitch_response_time = current_time
+                        else:
+                            remaining = cooldown - (current_time - self.last_twitch_response_time)
+                            print(f"[Engine] Twitch cooldown: {remaining:.1f}s remaining")
+
+                # Sleep briefly before next poll
+                time.sleep(0.5)
+
+            except Exception as e:
+                print(f"[Engine] Twitch polling error: {e}")
+                time.sleep(1)
+
+    def _should_respond_to_twitch(self, message):
+        """Determine if bot should respond to Twitch message - NEW"""
+        import random
+
+        response_mode = self.config.get('twitch_response_mode', 'all')
+
+        if response_mode == 'all':
+            # Respond to every message
+            return True
+
+        elif response_mode == 'keywords':
+            # Respond only if message contains keywords
+            keywords = self.config.get('twitch_keywords', '!ai,!bot,!ask')
+            keyword_list = [k.strip().lower() for k in keywords.split(',') if k.strip()]
+            message_lower = message.lower()
+
+            return any(keyword in message_lower for keyword in keyword_list)
+
+        elif response_mode == 'random':
+            # Respond based on random chance
+            chance = self.config.get('twitch_response_chance', 100)
+            return random.randint(1, 100) <= chance
+
+        elif response_mode == 'disabled':
+            # Don't respond to any messages
+            return False
+
+        return False
 
     def process_microphone_input(self):
         """Listen to microphone and process input"""
@@ -224,21 +372,8 @@ class ChatbotEngine:
             print("[Engine] No speech detected")
 
     def process_twitch_messages(self):
-        """Process pending Twitch chat messages"""
-        if not self.inputs.enabled_inputs['twitch']:
-            return
-
-        messages = self.inputs.get_twitch_messages()
-
-        for msg in messages:
-            username = msg['username']
-            message = msg['message']
-
-            # Format input with username
-            user_input = f"{username} says: {message}"
-
-            # Process and respond
-            self._process_and_respond(user_input)
+        """DEPRECATED: Use start_twitch_polling() instead"""
+        print("[Engine] WARNING: process_twitch_messages() is deprecated. Twitch polling is automatic when enabled.")
 
     def process_text_input(self, text):
         """Process direct text input"""
@@ -246,32 +381,57 @@ class ChatbotEngine:
             self._process_and_respond(text)
 
     def _process_and_respond(self, user_input, image_data=None):
-        """Process input and generate response - FIXED vision model checking"""
+        """Process input and generate response - UPDATED with response length control"""
         if not self.is_running:
             return
 
         print(f"[Engine] Processing: {user_input[:100]}")
 
         try:
-            # FIXED: Use exact model matching for vision support
+            # Determine max response tokens based on length setting
+            response_length = self.config.get('response_length', 'normal')
+
+            if response_length == 'brief':
+                max_tokens = 60  # Very short responses
+            elif response_length == 'normal':
+                max_tokens = 150  # Standard responses
+            elif response_length == 'detailed':
+                max_tokens = 300  # Longer, detailed responses
+            elif response_length == 'custom':
+                max_tokens = self.config.get('max_response_tokens', 150)
+            else:
+                max_tokens = 150  # Default
+
+            print(f"[Engine] Max response tokens: {max_tokens}")
+
+            # Check vision support
             model = self.config['llm_model']
             vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-            supports_vision = model in vision_models  # EXACT match, not substring
+            supports_vision = model in vision_models
 
             print(f"[Engine] Model: {model}, Supports vision: {supports_vision}, Has image: {bool(image_data)}")
 
+            # Get response
             if image_data and supports_vision:
                 print("[Engine] Using vision model with image")
-                response = self.llm.chat_with_vision(user_input, image_data)
+                response = self.llm.chat_with_vision(
+                    user_input,
+                    image_data,
+                    max_response_tokens=max_tokens
+                )
             elif image_data and not supports_vision:
-                # Warn if image provided but model doesn't support it
                 print(f"[Engine] WARNING: Model '{model}' doesn't support vision, using text-only")
-                response = self.llm.chat(user_input)
-                # Add note to response
+                response = self.llm.chat(
+                    user_input,
+                    max_response_tokens=max_tokens
+                )
                 response = f"[Note: I can't see images with {model}. Please use gpt-4o for vision.]\n\n" + response
             else:
                 print("[Engine] Using text-only mode")
-                response = self.llm.chat(user_input)
+                response = self.llm.chat(
+                    user_input,
+                    max_response_tokens=max_tokens
+                )
 
             print(f"[Engine] Response: {response[:100]}")
 
@@ -282,7 +442,7 @@ class ChatbotEngine:
             # Speak response
             self._speak_response(response)
 
-            # Auto-save conversation history after each interaction
+            # Auto-save conversation history
             self.save_conversation_history()
 
         except Exception as e:
@@ -290,7 +450,6 @@ class ChatbotEngine:
             error_details = traceback.format_exc()
             print(f"[Engine] Error processing input: {error_details}")
 
-            # Provide user-friendly error message
             error_response = f"Sorry, I encountered an error: {str(e)}"
             if self.on_response_callback:
                 self.on_response_callback(error_response)

@@ -647,7 +647,7 @@ TWITCH_OAUTH_TOKEN=
                 label.config(text="❌ Not configured", fg='#f44336')
 
     def create_setup_tab(self, notebook):
-        """Setup tab with GPT-5 models, personality, memory, and testing"""
+        """Setup tab with GPT models, personality, memory, response length, and testing - UPDATED"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='⚙️ Setup')
 
@@ -660,8 +660,8 @@ TWITCH_OAUTH_TOKEN=
         self.create_entry(config_frame, "Your Name:", 'user_name', 1)
 
         tk.Label(config_frame, text="LLM Model:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 11)).grid(row=2, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 11)).grid(row=2, column=0, sticky='w', pady=5)
 
         # Updated with actually available models
         models = [
@@ -673,10 +673,10 @@ TWITCH_OAUTH_TOKEN=
         ]
         self.llm_var = tk.StringVar(value=self.config['llm_model'])
         llm_menu = ttk.Combobox(config_frame, textvariable=self.llm_var,
-                               values=models, state='readonly', width=25)
+                                values=models, state='readonly', width=25)
         llm_menu.grid(row=2, column=1, sticky='w', pady=5)
         llm_menu.bind('<<ComboboxSelected>>',
-                     lambda e: self.update_config('llm_model', self.llm_var.get()))
+                      lambda e: self.update_config('llm_model', self.llm_var.get()))
 
         # Model info
         info_label = tk.Label(
@@ -688,8 +688,137 @@ TWITCH_OAUTH_TOKEN=
         )
         info_label.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
+        # NEW: Response Length Settings
+        response_section = self.create_section(scrollable, "Response Length & Style", 1)
+
+        tk.Label(
+            response_section,
+            text="Control how long and detailed the AI's responses are:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10)
+        ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # Response length preset
+        tk.Label(response_section, text="Response Length:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
+
+        self.response_length_var = tk.StringVar(value=self.config.get('response_length', 'normal'))
+        response_lengths = ['brief', 'normal', 'detailed', 'custom']
+        response_length_menu = ttk.Combobox(
+            response_section,
+            textvariable=self.response_length_var,
+            values=response_lengths,
+            state='readonly',
+            width=15
+        )
+        response_length_menu.grid(row=1, column=1, sticky='w', pady=5)
+        response_length_menu.bind('<<ComboboxSelected>>',
+                                  lambda e: self.on_response_length_change())
+
+        # Length descriptions
+        length_descriptions = {
+            'brief': '1-2 sentences (~20-40 words) - Perfect for quick chats',
+            'normal': '2-4 sentences (~40-80 words) - Balanced responses',
+            'detailed': '4-8 sentences (~80-150 words) - Thorough explanations',
+            'custom': 'Set your own token limit below'
+        }
+
+        self.length_desc_label = tk.Label(
+            response_section,
+            text=length_descriptions[self.response_length_var.get()],
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic'),
+            wraplength=500,
+            justify='left'
+        )
+        self.length_desc_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
+
+        # Custom max tokens (only shown when 'custom' is selected)
+        self.custom_tokens_frame = tk.Frame(response_section, bg=self.colors['bg'])
+        self.custom_tokens_frame.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
+
+        tk.Label(
+            self.custom_tokens_frame,
+            text="Max Response Tokens:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10)
+        ).pack(side='left', padx=5)
+
+        self.max_response_tokens_var = tk.IntVar(value=self.config.get('max_response_tokens', 150))
+        self.max_response_tokens_slider = tk.Scale(
+            self.custom_tokens_frame,
+            from_=30,
+            to=500,
+            orient='horizontal',
+            variable=self.max_response_tokens_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            highlightthickness=0,
+            length=200,
+            command=lambda v: self.update_config('max_response_tokens', int(v))
+        )
+        self.max_response_tokens_slider.pack(side='left', padx=5)
+
+        self.tokens_value_label = tk.Label(
+            self.custom_tokens_frame,
+            text=f"{self.max_response_tokens_var.get()} tokens",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9)
+        )
+        self.tokens_value_label.pack(side='left', padx=5)
+
+        # Update token label when slider moves
+        self.max_response_tokens_slider.config(
+            command=lambda v: self.update_token_label(int(float(v)))
+        )
+
+        # Hide/show custom tokens based on selection
+        self.update_custom_tokens_visibility()
+
+        # Response style
+        tk.Label(response_section, text="Response Style:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
+
+        self.response_style_var = tk.StringVar(value=self.config.get('response_style', 'conversational'))
+        response_styles = ['casual', 'conversational', 'professional']
+        response_style_menu = ttk.Combobox(
+            response_section,
+            textvariable=self.response_style_var,
+            values=response_styles,
+            state='readonly',
+            width=15
+        )
+        response_style_menu.grid(row=4, column=1, sticky='w', pady=5)
+        response_style_menu.bind('<<ComboboxSelected>>',
+                                 lambda e: self.update_config('response_style', self.response_style_var.get()))
+
+        style_descriptions = {
+            'casual': 'Relaxed, friendly tone with contractions',
+            'conversational': 'Warm, natural conversation style',
+            'professional': 'Formal, polished language'
+        }
+
+        self.style_desc_label = tk.Label(
+            response_section,
+            text=style_descriptions[self.response_style_var.get()],
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic')
+        )
+        self.style_desc_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=5)
+
+        # Update description when style changes
+        response_style_menu.bind('<<ComboboxSelected>>',
+                                 lambda e: self.update_style_description())
+
         # Memory & Context Settings
-        memory_section = self.create_section(scrollable, "Memory & Context Settings", 1)
+        memory_section = self.create_section(scrollable, "Memory & Context Settings", 2)
 
         tk.Label(
             memory_section,
@@ -710,8 +839,8 @@ TWITCH_OAUTH_TOKEN=
 
         # Max context tokens
         tk.Label(memory_section, text="Max Context Tokens:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
 
         self.max_tokens_var = tk.StringVar(value=self.config.get('max_context_tokens', '8000'))
         max_tokens_options = ['4000', '8000', '16000', '32000', '128000']
@@ -724,7 +853,7 @@ TWITCH_OAUTH_TOKEN=
         )
         max_tokens_menu.grid(row=2, column=1, sticky='w', pady=5)
         max_tokens_menu.bind('<<ComboboxSelected>>',
-                            lambda e: self.update_config('max_context_tokens', int(self.max_tokens_var.get())))
+                             lambda e: self.update_config('max_context_tokens', int(self.max_tokens_var.get())))
 
         tk.Label(
             memory_section,
@@ -736,8 +865,8 @@ TWITCH_OAUTH_TOKEN=
 
         # Conversation reset option
         tk.Label(memory_section, text="Auto-Reset Conversation:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
 
         self.auto_reset_var = tk.BooleanVar(value=self.config.get('auto_reset', False))
         auto_reset_check = tk.Checkbutton(
@@ -766,11 +895,11 @@ TWITCH_OAUTH_TOKEN=
         reset_btn.grid(row=5, column=0, columnspan=2, pady=10)
 
         # Personality section integrated into Setup tab
-        personality_section = self.create_section(scrollable, "AI Personality", 2)
+        personality_section = self.create_section(scrollable, "AI Personality", 3)
 
         tk.Label(personality_section, text="System Prompt / Personality:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 11, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 11, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         text_frame = tk.Frame(personality_section, bg=self.colors['accent'], bd=2)
         text_frame.grid(row=1, column=0, columnspan=2, sticky='ew', pady=5)
@@ -800,7 +929,7 @@ TWITCH_OAUTH_TOKEN=
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
         # Test AI Connection section
-        test_section = self.create_section(scrollable, "Test AI Connection", 3)
+        test_section = self.create_section(scrollable, "Test AI Connection", 4)
 
         test_info = tk.Label(
             test_section,
@@ -836,6 +965,47 @@ TWITCH_OAUTH_TOKEN=
             justify='left'
         )
         self.test_status_label.grid(row=1, column=1, sticky='w', padx=10)
+
+    # NEW: Helper methods for response length UI
+    def on_response_length_change(self):
+        """Handle response length selection change"""
+        length = self.response_length_var.get()
+        self.update_config('response_length', length)
+
+        # Update description
+        length_descriptions = {
+            'brief': '1-2 sentences (~20-40 words) - Perfect for quick chats',
+            'normal': '2-4 sentences (~40-80 words) - Balanced responses',
+            'detailed': '4-8 sentences (~80-150 words) - Thorough explanations',
+            'custom': 'Set your own token limit below'
+        }
+        self.length_desc_label.config(text=length_descriptions[length])
+
+        # Show/hide custom tokens
+        self.update_custom_tokens_visibility()
+
+    def update_custom_tokens_visibility(self):
+        """Show or hide custom tokens slider based on selection"""
+        if self.response_length_var.get() == 'custom':
+            self.custom_tokens_frame.grid()
+        else:
+            self.custom_tokens_frame.grid_remove()
+
+    def update_token_label(self, value):
+        """Update the token count label"""
+        self.tokens_value_label.config(text=f"{value} tokens")
+        self.update_config('max_response_tokens', value)
+
+    def update_style_description(self):
+        """Update response style description"""
+        style = self.response_style_var.get()
+        style_descriptions = {
+            'casual': 'Relaxed, friendly tone with contractions',
+            'conversational': 'Warm, natural conversation style',
+            'professional': 'Formal, polished language'
+        }
+        self.style_desc_label.config(text=style_descriptions[style])
+        self.update_config('response_style', style)
 
     def create_tts_tab(self, notebook):
         """TTS tab with dynamic voice dropdown and voice testing"""
@@ -1049,7 +1219,7 @@ TWITCH_OAUTH_TOKEN=
         self.update_voice_dropdown()
 
     def create_inputs_tab(self, notebook):
-        """Inputs tab with microphone selection and screenshot testing"""
+        """Inputs tab with microphone, screenshot, and ENHANCED Twitch settings - UPDATED"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='🎤 Inputs')
 
@@ -1074,12 +1244,12 @@ TWITCH_OAUTH_TOKEN=
 
         # Microphone device selection
         tk.Label(mic_section, text="Microphone Device:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
 
         self.mic_device_var = tk.StringVar(value="Default")
         self.mic_device_menu = ttk.Combobox(mic_section, textvariable=self.mic_device_var,
-                                           state='readonly', width=35)
+                                            state='readonly', width=35)
         self.mic_device_menu.grid(row=1, column=1, sticky='w', pady=5)
 
         # Populate microphone list
@@ -1099,8 +1269,8 @@ TWITCH_OAUTH_TOKEN=
 
         # Recording mode
         tk.Label(mic_section, text="Recording Mode:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
 
         mode_label = tk.Label(
             mic_section,
@@ -1150,9 +1320,10 @@ TWITCH_OAUTH_TOKEN=
         )
         self.test_screenshot_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
 
-        # Twitch
-        twitch_section = self.create_section(scrollable, "Twitch Integration", 2)
+        # UPDATED: Enhanced Twitch Integration
+        twitch_section = self.create_section(scrollable, "Twitch Chat Integration", 2)
 
+        # Enable checkbox
         self.twitch_var = tk.BooleanVar(value=self.config['twitch_enabled'])
         twitch_check = tk.Checkbutton(
             twitch_section,
@@ -1160,13 +1331,230 @@ TWITCH_OAUTH_TOKEN=
             variable=self.twitch_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11),
+            font=('Arial', 11, 'bold'),
             selectcolor=self.colors['accent'],
             command=lambda: self.update_config('twitch_enabled', self.twitch_var.get())
         )
         twitch_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
+        # Channel name
         self.twitch_entry = self.create_entry(twitch_section, "Channel Name:", 'twitch_channel', 1)
+
+        # NEW: Read Username Setting
+        tk.Label(twitch_section, text="Include Username:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+
+        self.twitch_read_username_var = tk.BooleanVar(value=self.config.get('twitch_read_username', True))
+        username_check = tk.Checkbutton(
+            twitch_section,
+            text='Read "Username says: message" to AI',
+            variable=self.twitch_read_username_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9),
+            selectcolor=self.colors['accent'],
+            command=lambda: self.update_config('twitch_read_username', self.twitch_read_username_var.get())
+        )
+        username_check.grid(row=2, column=1, sticky='w', pady=5)
+
+        # NEW: Response Mode
+        tk.Label(twitch_section, text="Response Mode:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=3, column=0, sticky='w', pady=5)
+
+        self.twitch_response_mode_var = tk.StringVar(value=self.config.get('twitch_response_mode', 'all'))
+        response_modes = ['all', 'keywords', 'random', 'disabled']
+        twitch_mode_menu = ttk.Combobox(
+            twitch_section,
+            textvariable=self.twitch_response_mode_var,
+            values=response_modes,
+            state='readonly',
+            width=15
+        )
+        twitch_mode_menu.grid(row=3, column=1, sticky='w', pady=5)
+        twitch_mode_menu.bind('<<ComboboxSelected>>',
+                              lambda e: self.on_twitch_mode_change())
+
+        # Mode descriptions
+        mode_descriptions = {
+            'all': 'Respond to every message (use with cooldown!)',
+            'keywords': 'Only respond to messages with specific keywords',
+            'random': 'Respond randomly based on chance percentage',
+            'disabled': 'Read messages but never respond automatically'
+        }
+
+        self.twitch_mode_desc = tk.Label(
+            twitch_section,
+            text=mode_descriptions[self.twitch_response_mode_var.get()],
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic'),
+            wraplength=400,
+            justify='left'
+        )
+        self.twitch_mode_desc.grid(row=4, column=0, columnspan=2, sticky='w', pady=5)
+
+        # NEW: Keywords (shown when mode is 'keywords')
+        self.twitch_keywords_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
+        self.twitch_keywords_frame.grid(row=5, column=0, columnspan=2, sticky='ew', pady=5)
+
+        tk.Label(
+            self.twitch_keywords_frame,
+            text="Keywords (comma-separated):",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10)
+        ).pack(side='left', padx=5)
+
+        self.twitch_keywords_entry = tk.Entry(
+            self.twitch_keywords_frame,
+            bg=self.colors['entry_bg'],
+            font=('Arial', 10),
+            width=30
+        )
+        self.twitch_keywords_entry.pack(side='left', padx=5)
+        self.twitch_keywords_entry.insert(0, self.config.get('twitch_keywords', '!ai,!bot,!ask'))
+        self.twitch_keywords_entry.bind('<FocusOut>',
+                                        lambda e: self.update_config('twitch_keywords',
+                                                                     self.twitch_keywords_entry.get()))
+
+        tk.Label(
+            self.twitch_keywords_frame,
+            text='e.g., "!ai, !bot, hey chat"',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 8, 'italic')
+        ).pack(side='left', padx=5)
+
+        # NEW: Response Chance (shown when mode is 'random')
+        self.twitch_chance_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
+        self.twitch_chance_frame.grid(row=6, column=0, columnspan=2, sticky='w', pady=5)
+
+        tk.Label(
+            self.twitch_chance_frame,
+            text="Response Chance:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10)
+        ).pack(side='left', padx=5)
+
+        self.twitch_chance_var = tk.IntVar(value=self.config.get('twitch_response_chance', 100))
+        chance_slider = tk.Scale(
+            self.twitch_chance_frame,
+            from_=1,
+            to=100,
+            orient='horizontal',
+            variable=self.twitch_chance_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            highlightthickness=0,
+            length=150,
+            command=lambda v: self.update_config('twitch_response_chance', int(float(v)))
+        )
+        chance_slider.pack(side='left', padx=5)
+
+        self.chance_label = tk.Label(
+            self.twitch_chance_frame,
+            text=f"{self.twitch_chance_var.get()}%",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9)
+        )
+        self.chance_label.pack(side='left', padx=5)
+
+        chance_slider.config(command=lambda v: self.update_chance_label(int(float(v))))
+
+        # NEW: Cooldown Setting
+        tk.Label(twitch_section, text="Response Cooldown:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=('Arial', 10)).grid(row=7, column=0, sticky='w', pady=5)
+
+        cooldown_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
+        cooldown_frame.grid(row=7, column=1, sticky='w', pady=5)
+
+        self.twitch_cooldown_var = tk.IntVar(value=self.config.get('twitch_cooldown', 5))
+        cooldown_slider = tk.Scale(
+            cooldown_frame,
+            from_=0,
+            to=60,
+            orient='horizontal',
+            variable=self.twitch_cooldown_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            highlightthickness=0,
+            length=150,
+            command=lambda v: self.update_config('twitch_cooldown', int(float(v)))
+        )
+        cooldown_slider.pack(side='left', padx=5)
+
+        self.cooldown_label = tk.Label(
+            cooldown_frame,
+            text=f"{self.twitch_cooldown_var.get()}s",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9)
+        )
+        self.cooldown_label.pack(side='left', padx=5)
+
+        cooldown_slider.config(command=lambda v: self.update_cooldown_label(int(float(v))))
+
+        tk.Label(
+            twitch_section,
+            text="💡 Cooldown prevents spam - set to 0 to respond immediately to every message",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).grid(row=8, column=0, columnspan=2, sticky='w', pady=5)
+
+        # Update visibility based on current mode
+        self.update_twitch_mode_visibility()
+
+    # NEW: Helper methods for Twitch UI
+    def on_twitch_mode_change(self):
+        """Handle Twitch response mode change"""
+        mode = self.twitch_response_mode_var.get()
+        self.update_config('twitch_response_mode', mode)
+
+        # Update description
+        mode_descriptions = {
+            'all': 'Respond to every message (use with cooldown!)',
+            'keywords': 'Only respond to messages with specific keywords',
+            'random': 'Respond randomly based on chance percentage',
+            'disabled': 'Read messages but never respond automatically'
+        }
+        self.twitch_mode_desc.config(text=mode_descriptions[mode])
+
+        # Update visibility
+        self.update_twitch_mode_visibility()
+
+    def update_twitch_mode_visibility(self):
+        """Show/hide Twitch settings based on mode"""
+        mode = self.twitch_response_mode_var.get()
+
+        # Show keywords only in 'keywords' mode
+        if mode == 'keywords':
+            self.twitch_keywords_frame.grid()
+        else:
+            self.twitch_keywords_frame.grid_remove()
+
+        # Show chance slider only in 'random' mode
+        if mode == 'random':
+            self.twitch_chance_frame.grid()
+        else:
+            self.twitch_chance_frame.grid_remove()
+
+    def update_chance_label(self, value):
+        """Update response chance label"""
+        self.chance_label.config(text=f"{value}%")
+        self.update_config('twitch_response_chance', value)
+
+    def update_cooldown_label(self, value):
+        """Update cooldown label"""
+        self.cooldown_label.config(text=f"{value}s")
+        self.update_config('twitch_cooldown', value)
 
     def create_avatar_tab(self, notebook):
         """Avatar images tab with preview"""

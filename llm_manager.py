@@ -66,7 +66,7 @@ class LLMManager:
                 break
 
     def chat(self, user_message, temperature=0.7, max_response_tokens=500):
-        """Send message and get response"""
+        """Send message and get response - UPDATED with configurable max_response_tokens"""
         if not user_message.strip():
             return ""
 
@@ -85,7 +85,7 @@ class LLMManager:
                 model=self.model,
                 messages=self.chat_history,
                 temperature=temperature,
-                max_tokens=max_response_tokens
+                max_tokens=max_response_tokens  # Now configurable
             )
 
             # Extract response
@@ -104,8 +104,8 @@ class LLMManager:
             print(error_msg)
             return error_msg
 
-    def chat_with_vision(self, user_message, image_url=None, temperature=0.7):
-        """Send message with optional image for vision models - FIXED vision checking"""
+    def chat_with_vision(self, user_message, image_url=None, temperature=0.7, max_response_tokens=500):
+        """Send message with optional image for vision models - UPDATED with configurable tokens"""
         if not user_message.strip():
             return ""
 
@@ -117,7 +117,7 @@ class LLMManager:
 
         if not supports_vision and image_url:
             print(f"[LLM] WARNING: {self.model} doesn't support vision. Falling back to text-only.")
-            return self.chat(user_message, temperature)
+            return self.chat(user_message, temperature, max_response_tokens)
 
         # Create message content with image
         if image_url and supports_vision:
@@ -154,7 +154,7 @@ class LLMManager:
                 model=self.model,
                 messages=self.chat_history,
                 temperature=temperature,
-                max_tokens=500
+                max_tokens=max_response_tokens  # Now configurable
             )
 
             assistant_message = response.choices[0].message.content
