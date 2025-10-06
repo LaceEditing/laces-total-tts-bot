@@ -49,6 +49,8 @@ class IntegratedChatbotApp:
         self.root.configure(bg=self.colors['bg'])
 
         self.engine = ChatbotEngine()
+        self.engine.on_volume_update = lambda vol: self.update_audio_meter(vol) if hasattr(self,
+                                                                                           'update_audio_meter') else None
         self.config = self.engine.config
 
         self.is_recording = False
@@ -73,6 +75,7 @@ class IntegratedChatbotApp:
         self.engine.on_response_callback = self.display_response
         self.engine.on_speaking_start = self.on_ai_speaking_start
         self.engine.on_speaking_end = self.on_ai_speaking_end
+        self.engine.on_volume_update = self.update_audio_meter
 
         self.show_welcome_message()
 
@@ -1607,32 +1610,36 @@ TWITCH_OAUTH_TOKEN=
         self.update_config('twitch_cooldown', value)
 
     def create_avatar_tab(self, notebook):
-        """Avatar images tab with window controls"""
+        """Avatar tab with audio-reactive controls"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='Avatar')
 
         scrollable = self.create_scrollable_frame(tab)
 
-        # Updated info section
+        # Info section
         info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
         info_frame.pack(fill='x', padx=40, pady=25)
 
         info_text = """
-    ✨ NEW & IMPROVED Avatar System ✨
+    AUDIO-REACTIVE FUNNY MOUTH SYSTEM
 
-    Your avatar will appear in a SEPARATE WINDOW that you can capture in OBS!
+    The little guy reacts to audio volume levels in real time
 
-    • SPEAKING IMAGE: Shown when AI is talking (e.g., open mouth, animated)
-    • IDLE IMAGE: Shown when AI is silent (e.g., closed mouth, waiting)
+    • SPEAKING IMAGE: Shown when audio volume is ABOVE threshold (mouth open)
+    • IDLE IMAGE: Shown when audio volume is BELOW threshold (mouth closed)
+    • AUTOMATIC SWITCHING: Avatar mouth opens and closes naturally with speech
+
+    The sensitivity slider lets you control when the mouth opens:
+      - LOWER = Opens easily (more sensitive, opens on quiet sounds)
+      - HIGHER = Opens only on loud sounds (less sensitive, requires louder audio)
 
     HOW TO USE:
     1. Select your idle and speaking images below
-    2. Click "Show Avatar Window" to open the avatar display
-    3. In OBS: Add Source → Window Capture → Select "AI Avatar" window
-    4. The window background is green (#00FF00) - use Chroma Key filter in OBS to make it transparent
-    5. You can minimize the window and it will still update - perfect for streaming!
-
-    The avatar automatically switches when your bot speaks or goes silent.
+    2. Adjust sensitivity slider to your preference
+    3. Click "Show Avatar Window" to display the avatar
+    4. In OBS: Window Capture → Select the Avatar window that opens when you start the bot
+    5. Add Chroma Key filter to make background transparent
+    6. Play around with the audio slider to find the most natural looking movement
         """
 
         tk.Label(
@@ -1644,17 +1651,165 @@ TWITCH_OAUTH_TOKEN=
             justify='left'
         ).pack(padx=30, pady=20)
 
+        # AUDIO SENSITIVITY CONTROLS
+        sensitivity_section = self.create_section(scrollable, "🎚️ Audio Sensitivity Controls", 0)
+        sensitivity_section.grid_columnconfigure(0, weight=1)
+
+        tk.Label(
+            sensitivity_section,
+            text="Adjust how sensitive the avatar is to audio volume",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 10, 'italic')
+        ).pack(pady=(0, 15))
+
+        # Sensitivity slider
+        slider_frame = tk.Frame(sensitivity_section, bg=self.colors['bg'])
+        slider_frame.pack(fill='x', padx=20, pady=10)
+
+        tk.Label(
+            slider_frame,
+            text="Volume Threshold:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 11, 'bold')
+        ).pack(side='left', padx=10)
+
+        self.volume_threshold_var = tk.DoubleVar(value=self.config.get('volume_threshold', 0.02))
+
+        threshold_slider = tk.Scale(
+            slider_frame,
+            from_=0.005,
+            to=0.75,
+            resolution=0.001,
+            orient='horizontal',
+            variable=self.volume_threshold_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            highlightthickness=0,
+            length=300,
+            command=self.on_threshold_change
+        )
+        threshold_slider.pack(side='left', padx=10)
+
+        self.threshold_label = tk.Label(
+            slider_frame,
+            text=f"{self.volume_threshold_var.get():.3f}",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 10, 'bold'),
+            width=8
+        )
+        self.threshold_label.pack(side='left', padx=5)
+
+        # Sensitivity guide
+        guide_frame = tk.Frame(sensitivity_section, bg=self.colors['bg'])
+        guide_frame.pack(fill='x', padx=40, pady=10)
+
+        tk.Label(
+            guide_frame,
+            text="← MORE SENSITIVE (opens easily)",
+            bg=self.colors['bg'],
+            fg='#4CAF50',
+            font=('Arial', 9)
+        ).pack(side='left')
+
+        tk.Label(
+            guide_frame,
+            text="LESS SENSITIVE (requires louder audio) →",
+            bg=self.colors['bg'],
+            fg='#FF6B6B',
+            font=('Arial', 9)
+        ).pack(side='right')
+
+        # AUDIO METER
+        meter_section = self.create_section(scrollable, "🎵 Real-Time Audio Meter", 1)
+        meter_section.grid_columnconfigure(0, weight=1)
+
+        tk.Label(
+            meter_section,
+            text="Watch the meter during speech to see when avatar will open/close",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic')
+        ).pack(pady=(0, 10))
+
+        # Audio meter canvas
+        meter_frame = tk.Frame(meter_section, bg=self.colors['accent'], bd=3, relief='solid')
+        meter_frame.pack(padx=40, pady=10)
+
+        self.audio_meter = tk.Canvas(
+            meter_frame,
+            width=500,
+            height=80,
+            bg='#1a1a1a',
+            highlightthickness=0
+        )
+        self.audio_meter.pack(padx=3, pady=3)
+
+        # Initialize meter components
+        self.meter_threshold_line = None
+        self.meter_volume_bar = None
+        self.update_meter_threshold_line()
+
+        # Meter labels
+        meter_label_frame = tk.Frame(meter_section, bg=self.colors['bg'])
+        meter_label_frame.pack()
+
+        self.meter_status_label = tk.Label(
+            meter_label_frame,
+            text="IDLE (no audio)",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 12, 'bold')
+        )
+        self.meter_status_label.pack(pady=5)
+
+        self.meter_value_label = tk.Label(
+            meter_label_frame,
+            text="Volume: 0.000",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=('Arial', 9)
+        )
+        self.meter_value_label.pack()
+
+        # Test button
+        test_frame = tk.Frame(meter_section, bg=self.colors['bg'])
+        test_frame.pack(pady=15)
+
+        tk.Button(
+            test_frame,
+            text="🎤 Test Audio Sensitivity",
+            command=self.test_audio_sensitivity,
+            bg='#2196F3',
+            fg='white',
+            font=('Arial', 11, 'bold'),
+            relief='raised',
+            borderwidth=3,
+            cursor='hand2',
+            padx=20,
+            pady=10
+        ).pack()
+
+        tk.Label(
+            test_frame,
+            text="Plays test audio - watch meter and avatar to fine-tune sensitivity",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 8, 'italic')
+        ).pack(pady=5)
+
         # Window controls section
-        controls_section = self.create_section(scrollable, "Avatar Window Controls", 0)
+        controls_section = self.create_section(scrollable, "Avatar Window Controls", 2)
         controls_section.grid_columnconfigure(0, weight=1)
-        controls_section.grid_columnconfigure(1, weight=1)
 
         control_frame = tk.Frame(controls_section, bg=self.colors['bg'])
         control_frame.pack(pady=10)
 
         self.avatar_window_btn = tk.Button(
             control_frame,
-            text="👁️ Show Avatar Window",
+            text="Show Avatar Window",
             command=self.toggle_avatar_window,
             bg='#2196F3',
             fg='white',
@@ -1678,7 +1833,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             controls_section,
-            text="💡 Tip: You can minimize the window and it will keep working!\nPerfect for capturing in OBS without cluttering your screen.",
+            text="Tip: Keep the window open but hidden behind other windows so that OBS can keep the capture active",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=('Arial', 9, 'italic'),
@@ -1686,9 +1841,8 @@ TWITCH_OAUTH_TOKEN=
         ).pack(pady=10)
 
         # Image selection section
-        images_section = self.create_section(scrollable, "Select Avatar Images", 1)
+        images_section = self.create_section(scrollable, "Select Avatar Images", 3)
         images_section.grid_columnconfigure(0, weight=1)
-        images_section.grid_columnconfigure(1, weight=1)
 
         speaking_frame = tk.Frame(images_section, bg=self.colors['bg'])
         speaking_frame.pack(fill='x', pady=10)
@@ -1776,7 +1930,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Button(
             reload_frame,
-            text="🔄 Reload Avatar Window",
+            text="Reload Avatar Window",
             command=self.reload_avatar_images,
             bg=self.colors['button'],
             fg='white',
@@ -1795,10 +1949,9 @@ TWITCH_OAUTH_TOKEN=
             font=('Arial', 8, 'italic')
         ).pack(pady=5)
 
-        # Preview section (keep existing preview)
-        preview_section = self.create_section(scrollable, "Preview", 2)
+        # Preview section
+        preview_section = self.create_section(scrollable, "Preview", 4)
         preview_section.grid_columnconfigure(0, weight=1)
-        preview_section.grid_columnconfigure(1, weight=1)
 
         preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
         preview_container.pack(expand=True)
@@ -1819,6 +1972,137 @@ TWITCH_OAUTH_TOKEN=
         self.preview_label.pack(padx=3, pady=3)
 
         self.load_existing_avatar_previews()
+
+        # Start audio meter update loop
+        self.start_audio_meter_updates()
+
+    def on_threshold_change(self, value):
+        """Called when threshold slider changes"""
+        threshold = float(value)
+        self.threshold_label.config(text=f"{threshold:.3f}")
+        self.update_config('volume_threshold', threshold)
+
+        # Update engine if running
+        if self.engine and self.engine.is_running:
+            self.engine.set_volume_threshold(threshold)
+
+        # Update threshold line on meter
+        self.update_meter_threshold_line()
+
+    def update_meter_threshold_line(self):
+        """Update the threshold indicator line on the audio meter"""
+        if not hasattr(self, 'audio_meter'):
+            return
+
+        # Remove old line
+        if self.meter_threshold_line:
+            self.audio_meter.delete(self.meter_threshold_line)
+
+        # Calculate position (threshold is 0.0-0.15, meter is 500px wide)
+        threshold = self.volume_threshold_var.get()
+        x_pos = int((threshold / 0.75) * 500)
+
+        # Draw new threshold line
+        self.meter_threshold_line = self.audio_meter.create_line(
+            x_pos, 0, x_pos, 80,
+            fill='#FFD700',
+            width=2,
+            dash=(5, 5)
+        )
+
+        # Add label
+        self.audio_meter.create_text(
+            x_pos, 10,
+            text="THRESHOLD",
+            fill='#FFD700',
+            font=('Arial', 8, 'bold'),
+            anchor='s'
+        )
+
+    def start_audio_meter_updates(self):
+        """Start updating the audio meter in real-time"""
+
+        def update_meter():
+            if self.engine and self.engine.tts and self.engine.is_speaking:
+                # Get current volume from TTS manager
+                volume = self.engine.tts.get_current_volume()
+                self.update_audio_meter(volume)
+            else:
+                # No audio playing
+                self.update_audio_meter(0.0)
+
+            # Schedule next update (60 FPS)
+            self.root.after(16, update_meter)
+
+        # Start the update loop
+        self.root.after(100, update_meter)
+
+    def update_audio_meter(self, volume):
+        """Update the audio meter visualization"""
+        if not hasattr(self, 'audio_meter'):
+            return
+
+        # Remove old volume bar
+        if self.meter_volume_bar:
+            self.audio_meter.delete(self.meter_volume_bar)
+
+        # Calculate bar width (volume is 0.0-1.0, but we normalize to threshold range)
+        normalized_volume = min(volume, 0.75)  # Cap at max threshold
+        bar_width = int((normalized_volume / 0.75) * 500)
+
+        # Determine color based on threshold
+        threshold = self.volume_threshold_var.get()
+        if volume > threshold:
+            # Above threshold - green (speaking)
+            color = '#4CAF50'
+            status = "SPEAKING"
+            status_color = '#4CAF50'
+        else:
+            # Below threshold - red (idle)
+            color = '#FF6B6B'
+            status = "IDLE"
+            status_color = '#FF6B6B'
+
+        # Draw volume bar
+        if bar_width > 0:
+            self.meter_volume_bar = self.audio_meter.create_rectangle(
+                0, 0, bar_width, 80,
+                fill=color,
+                outline=''
+            )
+
+        # Update labels
+        self.meter_status_label.config(text=status, fg=status_color)
+        self.meter_value_label.config(text=f"Volume: {volume:.3f}")
+
+        # Ensure threshold line stays on top
+        if self.meter_threshold_line:
+            self.audio_meter.tag_raise(self.meter_threshold_line)
+
+    def test_audio_sensitivity(self):
+        """Test audio sensitivity with sample speech"""
+        if not self.engine or not self.engine.is_running:
+            messagebox.showwarning(
+                "Chatbot Not Running",
+                "Please start the chatbot first to test audio sensitivity!"
+            )
+            return
+
+        test_text = (
+            "Testing audio sensitivity. "
+            "Watch the audio meter and avatar. "
+            "The mouth should open when volume is above the threshold. "
+            "Try adjusting the sensitivity slider if needed."
+        )
+
+        # Display message
+        self.add_chat_message("System", "Testing audio sensitivity - watch the meter and avatar!")
+
+        # Speak test text
+        def test_thread():
+            self.engine._speak_response(test_text)
+
+        threading.Thread(target=test_thread, daemon=True).start()
 
     def toggle_avatar_window(self):
         """Toggle the avatar window visibility"""
@@ -1845,16 +2129,16 @@ TWITCH_OAUTH_TOKEN=
             self.engine._load_images()
             if self.engine.avatar_window:
                 self.engine.avatar_window.show()
-                self.avatar_window_btn.config(text="👁️ Hide Avatar Window")
+                self.avatar_window_btn.config(text="Hide Avatar Window")
                 self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
         else:
             # Toggle existing window
             is_visible = self.engine.toggle_avatar_window()
             if is_visible:
-                self.avatar_window_btn.config(text="👁️ Hide Avatar Window")
+                self.avatar_window_btn.config(text="Hide Avatar Window")
                 self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
             else:
-                self.avatar_window_btn.config(text="👁️ Show Avatar Window")
+                self.avatar_window_btn.config(text="Show Avatar Window")
                 self.avatar_status_label.config(text="⚫ Window Hidden", fg=self.colors['accent'])
 
     def reload_avatar_images(self):

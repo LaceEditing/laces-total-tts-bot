@@ -1,6 +1,6 @@
 ﻿"""
-Chatbot Engine - Main integration module
-UPDATED: Avatar Window System + Twitch TTS output controls
+Chatbot Engine - Enhanced with Audio-Reactive Avatar System
+Avatar responds to actual audio volume levels in real-time
 """
 
 import json
@@ -11,27 +11,21 @@ from llm_manager import LLMManager
 from tts_manager import TTSManager
 from input_handlers import InputManager
 from avatar_window import AvatarWindow
-from PIL import Image
-import tkinter as tk
 import os
 from dotenv import load_dotenv
 
-# Load environment variables at module import
 env_file = Path('.env')
 if env_file.exists():
     load_dotenv(env_file)
-    print("[Engine] Loaded environment variables from .env")
-else:
-    print("[Engine] Warning: No .env file found")
 
 class ChatbotEngine:
     def __init__(self, config_file='chatbot_config.json'):
-        """Initialize chatbot engine with configuration"""
+        """Initialize chatbot engine with audio-reactive avatar"""
         self.config_file = Path(config_file)
         self.history_file = Path('conversation_history.json')
         self.load_config()
 
-        # Initialize components
+        # Components
         self.llm = None
         self.tts = None
         self.inputs = InputManager()
@@ -41,25 +35,24 @@ class ChatbotEngine:
         self.is_speaking = False
         self.current_thread = None
 
-        # Twitch polling
+        # Twitch
         self.twitch_thread = None
         self.twitch_running = False
         self.last_twitch_response_time = 0
-
-        # Twitch TTS context tracking
         self.current_twitch_username = None
         self.current_twitch_message = None
 
-        # Avatar window (NEW)
+        # Avatar window
         self.avatar_window = None
 
         # Callbacks
         self.on_response_callback = None
         self.on_speaking_start = None
         self.on_speaking_end = None
+        self.on_volume_update = None  # NEW: For audio meter updates
 
     def load_config(self):
-        """Load configuration from file"""
+        """Load configuration"""
         if self.config_file.exists():
             with open(self.config_file, 'r') as f:
                 self.config = json.load(f)
@@ -67,7 +60,7 @@ class ChatbotEngine:
             self.config = self._default_config()
 
     def _default_config(self):
-        """Return default configuration"""
+        """Default configuration"""
         return {
             'ai_name': 'Assistant',
             'user_name': 'User',
@@ -82,90 +75,39 @@ class ChatbotEngine:
             'speaking_image': '',
             'idle_image': '',
             'max_context_tokens': 8000,
-            'auto_reset': False,
+            'volume_threshold': 0.02,  # NEW: Audio sensitivity
             'elevenlabs_stability': 0.5,
             'elevenlabs_similarity': 0.75,
             'elevenlabs_style': 0.0,
             'elevenlabs_speaker_boost': True,
             'response_length': 'normal',
             'max_response_tokens': 150,
-            'response_style': 'conversational',
-            'custom_response_style': '',
-            'twitch_read_username': True,
-            'twitch_response_mode': 'all',
-            'twitch_response_chance': 100,
-            'twitch_cooldown': 5,
-            'twitch_keywords': '!ai,!bot,!ask',
             'twitch_speak_username': True,
             'twitch_speak_message': True,
         }
 
-    def save_conversation_history(self):
-        """Save conversation history to JSON file"""
-        if self.llm and self.llm.chat_history:
-            try:
-                history_data = {
-                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
-                    'ai_name': self.config['ai_name'],
-                    'model': self.config['llm_model'],
-                    'conversation': self.llm.chat_history
-                }
-
-                with open(self.history_file, 'w', encoding='utf-8') as f:
-                    json.dump(history_data, f, indent=2, ensure_ascii=False)
-
-                print(f"[Engine] Saved conversation history to {self.history_file}")
-            except Exception as e:
-                print(f"[Engine] Error saving conversation history: {e}")
-
-    def load_conversation_history(self):
-        """Load conversation history from JSON file"""
-        if self.history_file.exists():
-            try:
-                with open(self.history_file, 'r', encoding='utf-8') as f:
-                    history_data = json.load(f)
-
-                if self.llm and 'conversation' in history_data:
-                    self.llm.chat_history = history_data['conversation']
-                    print(f"[Engine] Loaded conversation history from {self.history_file}")
-                    return True
-            except Exception as e:
-                print(f"[Engine] Error loading conversation history: {e}")
-        return False
-
     def _build_system_prompt(self):
-        """Build system prompt with personality and length instructions"""
+        """Build system prompt with personality and settings"""
         system_prompt = self.config['personality']
 
-        # Add AI name
         if self.config['ai_name'] != 'Assistant':
             system_prompt += f"\n\nYour name is {self.config['ai_name']}."
 
-        # Add user name
         if self.config['user_name'] != 'User':
             system_prompt += f"\nYou are talking to {self.config['user_name']}."
 
         # Add response length instructions
         response_length = self.config.get('response_length', 'normal')
-
         if response_length == 'brief':
-            system_prompt += "\n\nIMPORTANT: Keep ALL responses very brief and concise - typically 1-2 sentences (20-40 words max). Be direct and to the point."
+            system_prompt += "\n\nIMPORTANT: Keep ALL responses very brief and concise - typically 1-2 sentences (20-40 words max)."
         elif response_length == 'normal':
-            system_prompt += "\n\nKeep responses concise and engaging - typically 2-4 sentences (40-80 words). Avoid long paragraphs unless specifically asked."
+            system_prompt += "\n\nKeep responses concise and engaging - typically 2-4 sentences (40-80 words)."
         elif response_length == 'detailed':
-            system_prompt += "\n\nProvide thorough, detailed responses with explanations and context when helpful. Aim for 4-8 sentences (80-150 words) for most answers."
+            system_prompt += "\n\nProvide thorough, detailed responses - typically 4-8 sentences (80-150 words)."
 
         # Add response style
         response_style = self.config.get('response_style', 'conversational')
-
-        if response_style == 'casual':
-            system_prompt += "\n\nUse a casual, friendly tone. Feel free to use contractions and casual language."
-        elif response_style == 'professional':
-            system_prompt += "\n\nMaintain a professional, polished tone. Use proper grammar and formal language."
-        elif response_style == 'conversational':
-            system_prompt += "\n\nUse a warm, conversational tone that's friendly but clear."
-        elif response_style == 'custom':
-            # Use custom style text if provided
+        if response_style == 'custom':
             custom_style = self.config.get('custom_response_style', '')
             if custom_style:
                 system_prompt += f"\n\n{custom_style}"
@@ -173,7 +115,7 @@ class ChatbotEngine:
         return system_prompt
 
     def initialize(self):
-        """Initialize all components with current config"""
+        """Initialize all components"""
         system_prompt = self._build_system_prompt()
 
         self.llm = LLMManager(
@@ -195,6 +137,18 @@ class ChatbotEngine:
             elevenlabs_settings=elevenlabs_settings
         )
 
+        # Set volume threshold for audio-reactive avatar
+        volume_threshold = self.config.get('volume_threshold', 0.02)
+        self.tts.set_volume_threshold(volume_threshold)
+
+        # Set up audio-reactive callbacks
+        self.tts.set_audio_callbacks(
+            on_start=self._on_audio_start,
+            on_active=self._on_audio_active,
+            on_silent=self._on_audio_silent,
+            on_end=self._on_audio_end
+        )
+
         if self.config['twitch_enabled'] and self.config['twitch_channel']:
             self.inputs.enable_twitch(self.config['twitch_channel'])
 
@@ -205,69 +159,106 @@ class ChatbotEngine:
             self.inputs.enable_screen()
 
         self._load_images()
-
-        print("[Engine] Initialized successfully!")
+        print("[Engine] Initialized with audio-reactive avatar!")
 
     def _load_images(self):
-        """Initialize avatar window if images are configured"""
+        """Initialize avatar window"""
         try:
             idle_path = self.config.get('idle_image', '')
             speaking_path = self.config.get('speaking_image', '')
 
-            # Only create window if both images are configured
             if idle_path and speaking_path and Path(idle_path).exists() and Path(speaking_path).exists():
-                # Check if window already exists
                 if self.avatar_window is None:
                     self.avatar_window = AvatarWindow(
                         idle_image_path=idle_path,
                         speaking_image_path=speaking_path,
-                        bg_color='#00FF00',  # Green screen for OBS chroma key
-                        always_on_top=False  # Don't force on top
+                        bg_color='#00FF00',
+                        always_on_top=False
                     )
                     print(f"[Engine] Avatar window created")
                 else:
-                    # Update existing window with new images
                     self.avatar_window.load_images(idle_path, speaking_path)
-                    print(f"[Engine] Avatar window images updated")
-            else:
-                print("[Engine] Avatar images not configured or not found")
+                    print(f"[Engine] Avatar images updated")
 
         except Exception as e:
-            print(f"[Engine] Error initializing avatar window: {e}")
+            print(f"[Engine] Error loading avatar: {e}")
 
     def start(self):
-        """Start the chatbot engine"""
+        """Start the chatbot"""
         if not self.llm or not self.tts:
             self.initialize()
 
         self.is_running = True
-        print(f"[Engine] {self.config['ai_name']} is now running!")
+        print(f"[Engine] {self.config['ai_name']} is running with audio-reactive avatar!")
 
         if self.config['twitch_enabled'] and self.inputs.twitch:
             self.start_twitch_polling()
 
-        # Show idle avatar if window exists
         if self.avatar_window:
-            self._show_image('idle')
+            self._show_avatar('idle')
 
     def stop(self):
-        """Stop the chatbot engine"""
+        """Stop the chatbot"""
         self.is_running = False
-
-        # Stop Twitch polling
         self.stop_twitch_polling()
 
         if self.inputs.twitch:
             self.inputs.disable_twitch()
 
-        # Hide avatar window when stopping
         if self.avatar_window:
             self.avatar_window.hide()
 
         print("[Engine] Stopped")
 
+    # Audio-reactive callbacks (NEW)
+    def _on_audio_start(self):
+        """Called when audio playback starts"""
+        self.is_speaking = True
+        print("[Engine] 🎬 Audio started")
+
+        if self.on_speaking_start:
+            self.on_speaking_start()
+
+    def _on_audio_active(self):
+        """Called when volume rises above threshold - MOUTH OPENS"""
+        if self.avatar_window:
+            self.avatar_window.show_speaking()
+
+        # Update audio meter if callback exists
+        if self.on_volume_update and self.tts:
+            volume = self.tts.get_current_volume()
+            self.on_volume_update(volume)
+
+    def _on_audio_silent(self):
+        """Called when volume drops below threshold - MOUTH CLOSES"""
+        if self.avatar_window:
+            self.avatar_window.show_idle()
+
+        # Update audio meter if callback exists
+        if self.on_volume_update and self.tts:
+            volume = self.tts.get_current_volume()
+            self.on_volume_update(volume)
+
+    def _on_audio_end(self):
+        """Called when audio playback ends"""
+        self.is_speaking = False
+        print("[Engine] 🎬 Audio finished")
+
+        if self.avatar_window:
+            self.avatar_window.show_idle()
+
+        if self.on_speaking_end:
+            self.on_speaking_end()
+
+    def set_volume_threshold(self, threshold):
+        """Update volume threshold for audio detection"""
+        self.config['volume_threshold'] = threshold
+        if self.tts:
+            self.tts.set_volume_threshold(threshold)
+        print(f"[Engine] Volume threshold updated: {threshold:.3f}")
+
     def start_twitch_polling(self):
-        """Start polling Twitch chat for messages"""
+        """Start polling Twitch chat"""
         if self.twitch_running:
             return
 
@@ -277,14 +268,13 @@ class ChatbotEngine:
         print("[Engine] Twitch polling started")
 
     def stop_twitch_polling(self):
-        """Stop polling Twitch chat"""
+        """Stop Twitch polling"""
         self.twitch_running = False
         if self.twitch_thread:
             self.twitch_thread.join(timeout=2)
-        print("[Engine] Twitch polling stopped")
 
     def _twitch_poll_loop(self):
-        """Poll Twitch chat for messages and respond"""
+        """Poll Twitch for messages"""
         import random
 
         while self.twitch_running and self.is_running:
@@ -305,82 +295,63 @@ class ChatbotEngine:
                         cooldown = self.config.get('twitch_cooldown', 5)
 
                         if current_time - self.last_twitch_response_time >= cooldown:
-                            # Store Twitch context for TTS
                             self.current_twitch_username = username
                             self.current_twitch_message = message
 
-                            # Format the input for AI
                             if self.config.get('twitch_read_username', True):
                                 user_input = f"{username} says: {message}"
                             else:
                                 user_input = message
 
                             print(f"[Engine] Responding to Twitch: {user_input}")
-
-                            # Process and respond
                             self._process_and_respond(user_input)
 
-                            # Clear Twitch context after processing
                             self.current_twitch_username = None
                             self.current_twitch_message = None
-
                             self.last_twitch_response_time = current_time
-                        else:
-                            remaining = cooldown - (current_time - self.last_twitch_response_time)
-                            print(f"[Engine] Twitch cooldown: {remaining:.1f}s remaining")
 
                 time.sleep(0.5)
 
             except Exception as e:
-                print(f"[Engine] Twitch polling error: {e}")
+                print(f"[Engine] Twitch error: {e}")
                 time.sleep(1)
 
     def _should_respond_to_twitch(self, message):
-        """Determine if bot should respond to Twitch message"""
+        """Check if should respond to Twitch message"""
         import random
 
         response_mode = self.config.get('twitch_response_mode', 'all')
 
         if response_mode == 'all':
             return True
-
         elif response_mode == 'keywords':
-            keywords = self.config.get('twitch_keywords', '!ai,!bot,!ask')
-            keyword_list = [k.strip().lower() for k in keywords.split(',') if k.strip()]
-            message_lower = message.lower()
-            return any(keyword in message_lower for keyword in keyword_list)
-
+            keywords = self.config.get('twitch_keywords', '!ai,!bot').split(',')
+            return any(k.strip().lower() in message.lower() for k in keywords)
         elif response_mode == 'random':
             chance = self.config.get('twitch_response_chance', 100)
             return random.randint(1, 100) <= chance
-
         elif response_mode == 'disabled':
             return False
 
         return False
 
     def process_microphone_input(self):
-        """Listen to microphone and process input"""
+        """Process microphone input"""
         if not self.inputs.enabled_inputs['microphone']:
-            print("[Engine] Microphone is disabled")
             return
 
-        print(f"[Engine] Listening to microphone...")
-
+        print("[Engine] Listening...")
         user_text = self.inputs.listen_microphone(timeout=10)
 
         if user_text:
             screen_data = None
             if self.inputs.enabled_inputs['screen']:
                 screen_data = self.inputs.capture_screen()
-                print("[Engine] Screen captured for vision input")
 
             self._process_and_respond(user_text, screen_data)
-        else:
-            print("[Engine] No speech detected")
 
     def process_text_input(self, text):
-        """Process direct text input"""
+        """Process text input"""
         if text.strip():
             self._process_and_respond(text)
 
@@ -392,12 +363,10 @@ class ChatbotEngine:
         print(f"[Engine] Processing: {user_input[:100]}")
 
         try:
+            # Get max tokens based on response length
             response_length = self.config.get('response_length', 'normal')
-
             if response_length == 'brief':
                 max_tokens = 60
-            elif response_length == 'normal':
-                max_tokens = 150
             elif response_length == 'detailed':
                 max_tokens = 300
             elif response_length == 'custom':
@@ -405,160 +374,93 @@ class ChatbotEngine:
             else:
                 max_tokens = 150
 
-            print(f"[Engine] Max response tokens: {max_tokens}")
-
+            # Get response from LLM
             model = self.config['llm_model']
             vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-            supports_vision = model in vision_models
 
-            print(f"[Engine] Model: {model}, Supports vision: {supports_vision}, Has image: {bool(image_data)}")
-
-            if image_data and supports_vision:
-                print("[Engine] Using vision model with image")
-                response = self.llm.chat_with_vision(
-                    user_input,
-                    image_data,
-                    max_response_tokens=max_tokens
-                )
-            elif image_data and not supports_vision:
-                print(f"[Engine] WARNING: Model '{model}' doesn't support vision, using text-only")
-                response = self.llm.chat(
-                    user_input,
-                    max_response_tokens=max_tokens
-                )
-                response = f"[Note: I can't see images with {model}. Please use gpt-4o for vision.]\n\n" + response
+            if image_data and model in vision_models:
+                response = self.llm.chat_with_vision(user_input, image_data, max_response_tokens=max_tokens)
             else:
-                print("[Engine] Using text-only mode")
-                response = self.llm.chat(
-                    user_input,
-                    max_response_tokens=max_tokens
-                )
-
-            print(f"[Engine] Response: {response[:100]}")
+                response = self.llm.chat(user_input, max_response_tokens=max_tokens)
 
             if self.on_response_callback:
                 self.on_response_callback(response)
 
             self._speak_response(response)
-
             self.save_conversation_history()
 
         except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
-            print(f"[Engine] Error processing input: {error_details}")
-
-            error_response = f"Sorry, I encountered an error: {str(e)}"
-            if self.on_response_callback:
-                self.on_response_callback(error_response)
+            print(f"[Engine] Error: {e}")
 
     def _speak_response(self, text):
-        """Convert response to speech with Twitch username/message reading"""
+        """Speak response with Twitch context"""
         if not text.strip():
             return
 
-        # Construct full TTS message with Twitch context if applicable
         tts_text = text
 
-        # If responding to Twitch message, prepend username/message based on settings
+        # Add Twitch context if applicable
         if self.current_twitch_username or self.current_twitch_message:
             prepend_parts = []
 
-            # Check if we should speak the username
             if self.config.get('twitch_speak_username', True) and self.current_twitch_username:
                 prepend_parts.append(self.current_twitch_username)
 
-            # Check if we should speak the message
             if self.config.get('twitch_speak_message', True) and self.current_twitch_message:
                 if prepend_parts:
-                    # We have username, so format as "username said: message"
                     prepend_parts.append(f"said: {self.current_twitch_message}")
                 else:
-                    # No username, just say the message
                     prepend_parts.append(self.current_twitch_message)
 
-            # Construct the prepend text
             if prepend_parts:
-                prepend_text = " ".join(prepend_parts)
-                tts_text = f"{prepend_text}. {text}"
-                print(f"[Engine] TTS with Twitch context: {tts_text[:100]}...")
+                tts_text = " ".join(prepend_parts) + ". " + text
 
         def speak_thread():
-            self.tts.speak(
-                tts_text,
-                callback_on_start=self._on_speaking_start,
-                callback_on_end=self._on_speaking_end
-            )
+            self.tts.speak(tts_text)
 
         thread = threading.Thread(target=speak_thread, daemon=True)
         thread.start()
 
-    def _on_speaking_start(self):
-        """Called when TTS starts speaking"""
-        self.is_speaking = True
-
-        # Update avatar to speaking
-        self._show_image('speaking')
-
-        if self.on_speaking_start:
-            self.on_speaking_start()
-
-        print("[Engine] Started speaking")
-
-    def _on_speaking_end(self):
-        """Called when TTS finishes speaking"""
-        self.is_speaking = False
-
-        # Update avatar to idle
-        self._show_image('idle')
-
-        if self.on_speaking_end:
-            self.on_speaking_end()
-
-        print("[Engine] Finished speaking")
-
-    def _show_image(self, image_type):
-        """Update avatar window (idle or speaking)"""
-        try:
-            if self.avatar_window is None:
-                return
-
-            if image_type == 'speaking':
+    def _show_avatar(self, state):
+        """Show avatar in specific state"""
+        if self.avatar_window:
+            if state == 'speaking':
                 self.avatar_window.show_speaking()
-                print("[Engine] Avatar: SPEAKING")
-            else:  # idle
+            else:
                 self.avatar_window.show_idle()
-                print("[Engine] Avatar: IDLE")
-
-        except Exception as e:
-            print(f"[Engine] Error updating avatar: {e}")
 
     def toggle_avatar_window(self):
-        """Toggle avatar window visibility"""
+        """Toggle avatar window"""
         if self.avatar_window:
             self.avatar_window.toggle()
             return self.avatar_window.is_visible()
         return False
 
-    def show_avatar_window(self):
-        """Show avatar window"""
-        if self.avatar_window:
-            self.avatar_window.show()
+    def save_conversation_history(self):
+        """Save conversation to file"""
+        if self.llm and self.llm.chat_history:
+            try:
+                history_data = {
+                    'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'ai_name': self.config['ai_name'],
+                    'model': self.config['llm_model'],
+                    'conversation': self.llm.chat_history
+                }
 
-    def hide_avatar_window(self):
-        """Hide avatar window"""
-        if self.avatar_window:
-            self.avatar_window.hide()
+                with open(self.history_file, 'w', encoding='utf-8') as f:
+                    json.dump(history_data, f, indent=2, ensure_ascii=False)
+
+            except Exception as e:
+                print(f"[Engine] Error saving history: {e}")
 
     def set_config(self, key, value):
-        """Update configuration value"""
+        """Update config"""
         self.config[key] = value
 
     def reload_config(self):
-        """Reload configuration and reinitialize"""
+        """Reload configuration"""
         self.load_config()
         self.initialize()
-
 
 if __name__ == '__main__':
     print("Testing Chatbot Engine...")
