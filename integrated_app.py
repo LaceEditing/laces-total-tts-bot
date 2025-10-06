@@ -1607,25 +1607,32 @@ TWITCH_OAUTH_TOKEN=
         self.update_config('twitch_cooldown', value)
 
     def create_avatar_tab(self, notebook):
-        """Avatar images tab with preview"""
+        """Avatar images tab with window controls"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
         notebook.add(tab, text='Avatar')
 
         scrollable = self.create_scrollable_frame(tab)
 
+        # Updated info section
         info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
         info_frame.pack(fill='x', padx=40, pady=25)
 
         info_text = """
-Avatar Setup Instructions
+    ✨ NEW & IMPROVED Avatar System ✨
 
-The avatar is an animated PNG image that appears on screen while the bot is active.
+    Your avatar will appear in a SEPARATE WINDOW that you can capture in OBS!
 
-• SPEAKING IMAGE: Shown when AI is talking (e.g., open mouth, glowing, animated)
-• IDLE IMAGE: Shown when AI is silent (e.g., closed mouth, still, waiting)
+    • SPEAKING IMAGE: Shown when AI is talking (e.g., open mouth, animated)
+    • IDLE IMAGE: Shown when AI is silent (e.g., closed mouth, waiting)
 
-These images will automatically switch during conversation.
-This means you'll need to import the "current_avatar.png" image into OBS, and it will update automatically.
+    HOW TO USE:
+    1. Select your idle and speaking images below
+    2. Click "Show Avatar Window" to open the avatar display
+    3. In OBS: Add Source → Window Capture → Select "AI Avatar" window
+    4. The window background is green (#00FF00) - use Chroma Key filter in OBS to make it transparent
+    5. You can minimize the window and it will still update - perfect for streaming!
+
+    The avatar automatically switches when your bot speaks or goes silent.
         """
 
         tk.Label(
@@ -1637,7 +1644,49 @@ This means you'll need to import the "current_avatar.png" image into OBS, and it
             justify='left'
         ).pack(padx=30, pady=20)
 
-        images_section = self.create_section(scrollable, "Select Avatar Images", 0)
+        # Window controls section
+        controls_section = self.create_section(scrollable, "Avatar Window Controls", 0)
+        controls_section.grid_columnconfigure(0, weight=1)
+        controls_section.grid_columnconfigure(1, weight=1)
+
+        control_frame = tk.Frame(controls_section, bg=self.colors['bg'])
+        control_frame.pack(pady=10)
+
+        self.avatar_window_btn = tk.Button(
+            control_frame,
+            text="👁️ Show Avatar Window",
+            command=self.toggle_avatar_window,
+            bg='#2196F3',
+            fg='white',
+            font=('Arial', 12, 'bold'),
+            relief='raised',
+            borderwidth=3,
+            cursor='hand2',
+            width=25,
+            height=2
+        )
+        self.avatar_window_btn.pack(pady=5)
+
+        self.avatar_status_label = tk.Label(
+            control_frame,
+            text="⚫ Window Hidden",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 10, 'italic')
+        )
+        self.avatar_status_label.pack(pady=5)
+
+        tk.Label(
+            controls_section,
+            text="💡 Tip: You can minimize the window and it will keep working!\nPerfect for capturing in OBS without cluttering your screen.",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 9, 'italic'),
+            justify='center'
+        ).pack(pady=10)
+
+        # Image selection section
+        images_section = self.create_section(scrollable, "Select Avatar Images", 1)
         images_section.grid_columnconfigure(0, weight=1)
         images_section.grid_columnconfigure(1, weight=1)
 
@@ -1721,7 +1770,33 @@ This means you'll need to import the "current_avatar.png" image into OBS, and it
             pady=5
         ).pack(side='left', padx=5)
 
-        preview_section = self.create_section(scrollable, "Preview", 1)
+        # Reload button
+        reload_frame = tk.Frame(images_section, bg=self.colors['bg'])
+        reload_frame.pack(pady=15)
+
+        tk.Button(
+            reload_frame,
+            text="🔄 Reload Avatar Window",
+            command=self.reload_avatar_images,
+            bg=self.colors['button'],
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief='flat',
+            cursor='hand2',
+            padx=20,
+            pady=8
+        ).pack()
+
+        tk.Label(
+            reload_frame,
+            text="Click after changing images to update the avatar window",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=('Arial', 8, 'italic')
+        ).pack(pady=5)
+
+        # Preview section (keep existing preview)
+        preview_section = self.create_section(scrollable, "Preview", 2)
         preview_section.grid_columnconfigure(0, weight=1)
         preview_section.grid_columnconfigure(1, weight=1)
 
@@ -1742,7 +1817,69 @@ This means you'll need to import the "current_avatar.png" image into OBS, and it
             relief='flat'
         )
         self.preview_label.pack(padx=3, pady=3)
+
         self.load_existing_avatar_previews()
+
+    def toggle_avatar_window(self):
+        """Toggle the avatar window visibility"""
+        if not self.engine.avatar_window:
+            # Create window if it doesn't exist
+            idle = self.config.get('idle_image', '')
+            speaking = self.config.get('speaking_image', '')
+
+            if not idle or not speaking:
+                messagebox.showwarning(
+                    "Images Not Set",
+                    "Please select both idle and speaking images first!"
+                )
+                return
+
+            if not Path(idle).exists() or not Path(speaking).exists():
+                messagebox.showerror(
+                    "Images Not Found",
+                    "One or more image files could not be found.\nPlease check the file paths."
+                )
+                return
+
+            # Initialize avatar window
+            self.engine._load_images()
+            if self.engine.avatar_window:
+                self.engine.avatar_window.show()
+                self.avatar_window_btn.config(text="👁️ Hide Avatar Window")
+                self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
+        else:
+            # Toggle existing window
+            is_visible = self.engine.toggle_avatar_window()
+            if is_visible:
+                self.avatar_window_btn.config(text="👁️ Hide Avatar Window")
+                self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
+            else:
+                self.avatar_window_btn.config(text="👁️ Show Avatar Window")
+                self.avatar_status_label.config(text="⚫ Window Hidden", fg=self.colors['accent'])
+
+    def reload_avatar_images(self):
+        """Reload avatar images in the window"""
+        idle = self.config.get('idle_image', '')
+        speaking = self.config.get('speaking_image', '')
+
+        if not idle or not speaking:
+            messagebox.showwarning(
+                "Images Not Set",
+                "Please select both idle and speaking images first!"
+            )
+            return
+
+        if not Path(idle).exists() or not Path(speaking).exists():
+            messagebox.showerror(
+                "Images Not Found",
+                "One or more image files could not be found."
+            )
+            return
+
+        # Reload images
+        self.engine._load_images()
+        messagebox.showinfo("Success", "Avatar images reloaded successfully!")
+
     def create_control_panel(self, parent):
         """Create bottom control panel - always visible"""
         panel = tk.Frame(parent, bg=self.colors['accent'])
@@ -2182,6 +2319,11 @@ This means you'll need to import the "current_avatar.png" image into OBS, and it
             # Show preview
             self.update_avatar_preview(filename)
 
+            # Auto-reload avatar window if it exists
+            if self.engine.avatar_window:
+                self.engine._load_images()
+                print(f"[App] Auto-reloaded {image_type} image in avatar window")
+
     def update_avatar_preview(self, filename):
         """Update the avatar preview with the selected image"""
         try:
@@ -2458,7 +2600,7 @@ This means you'll need to import the "current_avatar.png" image into OBS, and it
     def show_welcome_message(self):
         """Show welcome message with setup instructions"""
         welcome_text = """
-    Thank you for using my silly little software! Here's how to get started:
+    Thank you so much for to using my silly little software! Here's how to get started:
 
     QUICK SETUP CHECKLIST:
 
