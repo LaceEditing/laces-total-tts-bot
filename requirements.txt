@@ -10,6 +10,7 @@ python-dotenv>=1.0.0
 SpeechRecognition>=3.10.0
 pyaudio>=0.2.14
 pygame>=2.5.2
+pydub>=0.25.1
 
 # Image processing
 Pillow>=10.2.0
@@ -26,3 +27,9 @@ coqui-tts  # Coqui TTS (open source)
 
 # HTTP requests
 requests>=2.31.0
+
+# Numpy
+numpy>=1.24.0
+
+# Scipy
+scipy>=1.10.0

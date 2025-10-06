@@ -2,7 +2,7 @@
 Complete AI Chatbot System - Integrated Application
 UPDATED: Added Twitch TTS output controls for reading username and message
 """
-
+import time
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import json
@@ -12,7 +12,16 @@ from pathlib import Path
 from chatbot_engine import ChatbotEngine
 from PIL import Image, ImageTk
 import os
+import sys
 from dotenv import load_dotenv, set_key
+
+def get_resource_path(relative_path):
+    """Get path that works in both script and PyInstaller exe"""
+    try:
+        base_path = sys._MEIPASS  # PyInstaller temp folder
+    except Exception:
+        base_path = os.path.abspath(".")  # Normal script
+    return os.path.join(base_path, relative_path)
 
 class IntegratedChatbotApp:
     def __init__(self, root):
@@ -57,10 +66,7 @@ class IntegratedChatbotApp:
         self.hotkey_active = False
 
         self.voice_options = {
-            'elevenlabs': ['rachel', 'drew', 'clyde', 'paul', 'domi', 'dave', 'fin',
-                          'sarah', 'antoni', 'thomas', 'charlie', 'emily', 'elli',
-                          'callum', 'patrick', 'harry', 'liam', 'dorothy', 'josh',
-                          'arnold', 'charlotte', 'alice', 'matilda', 'james'],
+            'elevenlabs': [],
             'streamelements': ['Brian', 'Ivy', 'Justin', 'Russell', 'Nicole', 'Emma',
                               'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
                               'Matthew', 'Geraint', 'Raveena'],
@@ -79,13 +85,15 @@ class IntegratedChatbotApp:
 
         self.show_welcome_message()
 
+        self.root.after(1000, self.auto_load_elevenlabs_voices)
+
     def load_custom_font(self, font_name, size, weight='normal'):
         """Load custom font - Windows compatible version"""
         try:
             import ctypes
             from ctypes import wintypes
 
-            font_path = Path('fonts') / font_name
+            font_path = Path(get_resource_path('fonts')) / font_name
 
             if font_path.exists():
                 gdi32 = ctypes.WinDLL('gdi32', use_last_error=True)
@@ -122,7 +130,7 @@ class IntegratedChatbotApp:
         try:
             icon_path = Path('icon.ico')
             if icon_path.exists():
-                self.root.iconbitmap(icon_path)
+                self.root.iconbitmap(str(icon_path.absolute()))
                 print("[App] Window icon loaded from icon.ico")
             else:
                 print("[App] icon.ico not found - using default icon")
@@ -2297,6 +2305,26 @@ TWITCH_OAUTH_TOKEN=
 
         return entry
 
+    def auto_load_elevenlabs_voices(self):
+        """Auto-load ElevenLabs voices if API key is configured"""
+        # Only if ElevenLabs is selected
+        if self.config.get('tts_service') == 'elevenlabs':
+            api_key = os.getenv('ELEVENLABS_API_KEY')
+
+            # Check if valid API key exists
+            if api_key and api_key != 'your-elevenlabs-key-here' and len(api_key) > 10:
+                print("[App] Auto-loading ElevenLabs voices...")
+
+                # Load in background thread
+                def load_voices_thread():
+                    try:
+                        time.sleep(0.5)  # Let UI load first
+                        self.refresh_elevenlabs_voices()
+                    except Exception as e:
+                        print(f"[App] Auto-load failed: {e}")
+
+                threading.Thread(target=load_voices_thread, daemon=True).start()
+
     def refresh_microphone_list(self):
         """Refresh list of available microphones"""
         try:
@@ -2506,23 +2534,46 @@ TWITCH_OAUTH_TOKEN=
         threading.Thread(target=test_thread, daemon=True).start()
 
     def update_voice_dropdown(self):
-        """Update voice dropdown based on selected TTS service"""
+        """Update voice dropdown based on selected TTS service - CRASH FIXED"""
         service = self.tts_var.get()
         voices = self.voice_options.get(service, ['default'])
 
-        self.voice_menu['values'] = voices
-
-        current_voice = self.voice_var.get()
-        if current_voice not in voices:
-            self.voice_var.set(voices[0])
-            self.update_config('elevenlabs_voice', voices[0])
-
         if service == 'elevenlabs':
+            # ElevenLabs - check if voices loaded
+            if not voices or len(voices) == 0:
+                # FIXED: Don't try to access voices[0] on empty list
+                self.voice_menu['values'] = ['⚠️ Click "Refresh Voices" to load']
+                self.voice_var.set('⚠️ Click "Refresh Voices" to load')
+                self.voice_info_label.config(
+                    text="👆 Click 'Refresh Voices' to load your ElevenLabs voices",
+                    fg=self.colors['accent']
+                )
+            else:
+                # Voices loaded - safe to access
+                self.voice_menu['values'] = voices
+                current_voice = self.voice_var.get()
+                if current_voice not in voices:
+                    self.voice_var.set(voices[0])
+                    self.update_config('elevenlabs_voice', voices[0])
+                self.voice_info_label.config(
+                    text=f"✅ {len(voices)} voice(s) loaded from your account",
+                    fg='#4CAF50'
+                )
+
+            # Show ElevenLabs controls
             self.refresh_voices_btn.grid()
             self.voice_info_label.grid()
             for widget in self.elevenlabs_settings_section.winfo_children():
                 widget.grid()
         else:
+            # Other TTS services
+            self.voice_menu['values'] = voices
+            current_voice = self.voice_var.get()
+            if current_voice not in voices and len(voices) > 0:
+                self.voice_var.set(voices[0])
+                self.update_config('elevenlabs_voice', voices[0])
+
+            # Hide ElevenLabs controls
             self.refresh_voices_btn.grid_remove()
             self.voice_info_label.grid_remove()
             for widget in self.elevenlabs_settings_section.winfo_children():

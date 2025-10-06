@@ -4,6 +4,8 @@ Analyzes actual audio volume levels for natural, responsive mouth animation
 """
 
 import os
+import sys
+
 import requests
 from pathlib import Path
 import pygame
@@ -28,6 +30,11 @@ class TTSManager:
             'style': 0.0,
             'use_speaker_boost': True
         }
+
+        # Hide console windows on Windows
+        if sys.platform == 'win32':
+            os.environ['SDL_VIDEODRIVER'] = 'dummy'
+            os.environ['SDL_AUDIODRIVER'] = 'directsound'
 
         # Initialize pygame mixer
         pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
