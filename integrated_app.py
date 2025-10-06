@@ -1000,6 +1000,36 @@ TWITCH_OAUTH_TOKEN=
         }
         self.style_desc_label.config(text=style_descriptions.get(style, ''))
 
+    def reinitialize_tts(self):
+        """Reinitialize TTS manager with current settings"""
+        if self.engine.is_running and self.engine.tts:
+            elevenlabs_settings = {
+                'stability': self.config.get('elevenlabs_stability', 0.5),
+                'similarity_boost': self.config.get('elevenlabs_similarity', 0.75),
+                'style': self.config.get('elevenlabs_style', 0.0),
+                'use_speaker_boost': self.config.get('elevenlabs_speaker_boost', True)
+            }
+
+            from tts_manager import TTSManager
+            self.engine.tts = TTSManager(
+                service=self.config['tts_service'],
+                voice=self.config['elevenlabs_voice'],
+                elevenlabs_settings=elevenlabs_settings
+            )
+
+            # Restore audio callbacks for avatar
+            self.engine.tts.set_audio_callbacks(
+                on_start=self.engine._on_audio_start,
+                on_active=self.engine._on_audio_active,
+                on_silent=self.engine._on_audio_silent,
+                on_end=self.engine._on_audio_end
+            )
+
+            # Restore volume threshold
+            self.engine.tts.set_volume_threshold(self.config.get('volume_threshold', 0.02))
+
+            print(f"[App] TTS reinitialized with voice: {self.config['elevenlabs_voice']}")
+
     def on_response_style_change(self):
         """Handle response style selection change"""
         style = self.response_style_var.get()
@@ -1034,6 +1064,12 @@ TWITCH_OAUTH_TOKEN=
         tts_menu = ttk.Combobox(tts_frame, textvariable=self.tts_var,
                                values=tts_services, state='readonly', width=25)
         tts_menu.grid(row=0, column=1, sticky='w', pady=5)
+
+        def on_tts_change(self, event=None):
+            """Handle TTS service change"""
+            self.update_config('tts_service', self.tts_var.get())
+            self.update_voice_dropdown()
+            self.reinitialize_tts()  # Apply immediately if chatbot is running
         tts_menu.bind('<<ComboboxSelected>>', self.on_tts_change)
 
         voice_section = self.create_section(scrollable, "Voice Settings", 1)
@@ -1049,8 +1085,12 @@ TWITCH_OAUTH_TOKEN=
                                        values=self.voice_options['elevenlabs'],
                                        state='readonly', width=35)
         self.voice_menu.grid(row=0, column=1, sticky='w', pady=5)
-        self.voice_menu.bind('<<ComboboxSelected>>',
-                            lambda e: self.update_config('elevenlabs_voice', self.voice_var.get()))
+
+        def on_voice_change(e):
+            self.update_config('elevenlabs_voice', self.voice_var.get())
+            self.reinitialize_tts()  # Apply immediately if chatbot is running
+
+        self.voice_menu.bind('<<ComboboxSelected>>', on_voice_change)
 
         self.refresh_voices_btn = tk.Button(
             voice_section,
@@ -1096,7 +1136,7 @@ TWITCH_OAUTH_TOKEN=
             fg=self.colors['fg'],
             highlightthickness=0,
             length=200,
-            command=lambda v: self.update_config('elevenlabs_stability', float(v))
+            command=lambda v: [self.update_config('elevenlabs_stability', float(v)), self.reinitialize_tts()]
         )
         stability_slider.grid(row=0, column=1, sticky='w', pady=5, padx=10)
 
@@ -1128,7 +1168,7 @@ TWITCH_OAUTH_TOKEN=
             fg=self.colors['fg'],
             highlightthickness=0,
             length=200,
-            command=lambda v: self.update_config('elevenlabs_similarity', float(v))
+            command=lambda v: [self.update_config('elevenlabs_similarity', float(v)), self.reinitialize_tts()]
         )
         similarity_slider.grid(row=1, column=1, sticky='w', pady=5, padx=10)
 
@@ -1160,7 +1200,7 @@ TWITCH_OAUTH_TOKEN=
             fg=self.colors['fg'],
             highlightthickness=0,
             length=200,
-            command=lambda v: self.update_config('elevenlabs_style', float(v))
+            command=lambda v: [self.update_config('elevenlabs_style', float(v)), self.reinitialize_tts()]
         )
         style_slider.grid(row=2, column=1, sticky='w', pady=5, padx=10)
 
