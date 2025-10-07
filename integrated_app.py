@@ -31,8 +31,6 @@ class IntegratedChatbotApp:
         self.root.geometry("900x900")
         self.root.minsize(750, 800)
 
-        self.set_window_icon()
-
         self.env_file = Path('.env')
         if self.env_file.exists():
             load_dotenv(self.env_file)
@@ -57,6 +55,8 @@ class IntegratedChatbotApp:
         self.ui_font_large = self.load_custom_font('Quicksand-Medium.ttf', 11, 'normal')
 
         self.root.configure(bg=self.colors['bg'])
+
+        self.set_window_icon()
 
         self.engine = ChatbotEngine()
         self.engine.on_volume_update = lambda vol: self.update_audio_meter(vol) if hasattr(self,
@@ -127,7 +127,7 @@ class IntegratedChatbotApp:
             return ('Arial', size, weight)
 
     def set_window_icon(self):
-        """Set window and taskbar icons"""
+        """Set window and taskbar icons - FIXED for proper taskbar display"""
         try:
             # Get icon path - works in both dev and bundled
             if hasattr(sys, '_MEIPASS'):
@@ -142,46 +142,76 @@ class IntegratedChatbotApp:
                 self.root.iconbitmap(str(icon_path))
 
                 # Method 2: Force taskbar icon (Windows-specific)
+                # CRITICAL: Must be called AFTER window is visible
                 if sys.platform == 'win32':
-                    try:
-                        import ctypes
-
-                        # Get window handle
-                        hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
-
-                        # Load icon
-                        icon_flags = 0x00000000  # LR_DEFAULTSIZE
-                        hicon = ctypes.windll.user32.LoadImageW(
-                            0,  # hInst (0 = load from file)
-                            str(icon_path),
-                            1,  # IMAGE_ICON
-                            0, 0,  # width, height (0 = default)
-                            0x00000010  # LR_LOADFROMFILE
-                        )
-
-                        if hicon:
-                            # Set both small and large icons
-                            ctypes.windll.user32.SendMessageW(
-                                hwnd, 0x0080, 0, hicon  # WM_SETICON, ICON_SMALL
-                            )
-                            ctypes.windll.user32.SendMessageW(
-                                hwnd, 0x0080, 1, hicon  # WM_SETICON, ICON_LARGE
-                            )
-
-                            # Force taskbar to update
-                            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-                                "LaceAI.Chatbot.1.0"
-                            )
-
-                            print(f"[App] ✅ Taskbar icon set via Windows API")
-                    except Exception as e:
-                        print(f"[App] Could not set taskbar icon via API: {e}")
+                    # Schedule icon setting after window is fully created
+                    self.root.after(100, lambda: self._set_taskbar_icon(icon_path))
 
                 print(f"[App] Window icon loaded from: {icon_path}")
             else:
                 print(f"[App] icon.ico not found at: {icon_path}")
         except Exception as e:
             print(f"[App] Could not set window icon: {e}")
+
+    def _set_taskbar_icon(self, icon_path):
+        """Set taskbar icon using Windows API - called after window creation"""
+        try:
+            import ctypes
+            from ctypes import wintypes
+
+            # Force window to update and ensure it's visible
+            self.root.update_idletasks()
+
+            # Get the actual window handle (NOT parent)
+            hwnd = ctypes.windll.user32.FindWindowW(None, self.root.title())
+
+            # If FindWindowW fails, try getting from winfo_id
+            if not hwnd:
+                hwnd = self.root.winfo_id()
+
+            if hwnd:
+                # Load icon with proper flags
+                LR_LOADFROMFILE = 0x00000010
+                IMAGE_ICON = 1
+
+                # Load icon - specify 16x16 for small, 32x32 for large
+                hicon_small = ctypes.windll.user32.LoadImageW(
+                    None,
+                    icon_path,
+                    IMAGE_ICON,
+                    16, 16,  # Small icon size
+                    LR_LOADFROMFILE
+                )
+
+                hicon_large = ctypes.windll.user32.LoadImageW(
+                    None,
+                    icon_path,
+                    IMAGE_ICON,
+                    32, 32,  # Large icon size
+                    LR_LOADFROMFILE
+                )
+
+                # Set both icons
+                WM_SETICON = 0x0080
+                ICON_SMALL = 0
+                ICON_LARGE = 1
+
+                if hicon_small:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon_small)
+
+                if hicon_large:
+                    ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_LARGE, hicon_large)
+
+                # Set AppUserModelID to override taskbar grouping
+                try:
+                    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LaceAI.Chatbot.1.0")
+                except:
+                    pass
+
+                print(f"[App] ✅ Taskbar icon set successfully")
+
+        except Exception as e:
+            print(f"[App] Could not set taskbar icon: {e}")
 
     def create_default_env_file(self):
         """Create a default .env file if it doesn't exist"""
@@ -3133,7 +3163,15 @@ TWITCH_OAUTH_TOKEN=
         self.status_label.config(text="🟢 Running")
 
 
-def main():  # This should NOT be indented at all - it's outside the class
+def main():
+    # Set AppUserModelID before ANY window creation
+    if sys.platform == 'win32':
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LaceAI.Chatbot.1.0")
+        except:
+            pass
+
     root = tk.Tk()
     app = IntegratedChatbotApp(root)
     root.mainloop()
