@@ -1,12 +1,12 @@
 ﻿"""
-LLM Manager - Handles OpenAI API interactions
-Supports multiple GPT models with conversation history
-FIXED: Vision model checking and token counting for vision messages
+LLM Manager - PRODUCTION BUILD (No Console Output)
+Handles OpenAI API interactions with conversation history
 """
 
 import os
 from openai import OpenAI
 import tiktoken
+
 
 class LLMManager:
     def __init__(self, model='gpt-4o', system_prompt='You are a helpful assistant.', max_tokens=8000):
@@ -14,9 +14,8 @@ class LLMManager:
         self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
         self.model = model
         self.chat_history = []
-        self.max_tokens = max_tokens  # User-configurable context limit
+        self.max_tokens = max_tokens
 
-        # Add system prompt
         if system_prompt:
             self.chat_history.append({
                 "role": "system",
@@ -24,74 +23,61 @@ class LLMManager:
             })
 
     def count_tokens(self, messages):
-        """Count tokens in message list - FIXED to handle vision messages correctly"""
+        """Count tokens in message list"""
         try:
             encoding = tiktoken.encoding_for_model(self.model)
             num_tokens = 0
             for message in messages:
-                num_tokens += 4  # Message formatting overhead
+                num_tokens += 4
                 for key, value in message.items():
                     if key == "content":
-                        # Handle both string and list content (for vision messages)
                         if isinstance(value, list):
-                            # Vision message - approximate token count
                             for item in value:
                                 if item.get("type") == "text":
                                     num_tokens += len(encoding.encode(item.get("text", "")))
                                 elif item.get("type") == "image_url":
-                                    # Images use approximately 85-255 tokens depending on detail
-                                    # Using high detail, approximate 255 tokens
                                     num_tokens += 255
                         else:
-                            # Regular text message
                             num_tokens += len(encoding.encode(str(value)))
                     else:
                         num_tokens += len(encoding.encode(str(value)))
                         if key == "name":
                             num_tokens += -1
-            num_tokens += 2  # Assistant reply priming
+            num_tokens += 2
             return num_tokens
-        except Exception as e:
-            print(f"[LLM] Token counting error: {e}")
-            # Return a safe default to avoid breaking context management
+        except Exception:
             return 0
 
     def manage_context(self):
         """Trim old messages if context is too long"""
         while self.count_tokens(self.chat_history) > self.max_tokens:
             if len(self.chat_history) > 1:
-                # Keep system message, remove oldest user/assistant message
                 self.chat_history.pop(1)
             else:
                 break
 
     def chat(self, user_message, temperature=0.7, max_response_tokens=500):
-        """Send message and get response - UPDATED with configurable max_response_tokens"""
+        """Send message and get response"""
         if not user_message.strip():
             return ""
 
-        # Add user message to history
         self.chat_history.append({
             "role": "user",
             "content": user_message
         })
 
-        # Manage context length
         self.manage_context()
 
         try:
-            # Get completion from OpenAI
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=self.chat_history,
                 temperature=temperature,
-                max_tokens=max_response_tokens  # Now configurable
+                max_tokens=max_response_tokens
             )
 
-            # Extract response
             assistant_message = response.choices[0].message.content
 
-            # Add to history
             self.chat_history.append({
                 "role": "assistant",
                 "content": assistant_message
@@ -101,28 +87,20 @@ class LLMManager:
 
         except Exception as e:
             error_msg = f"Error getting LLM response: {e}"
-            print(error_msg)
             return error_msg
 
     def chat_with_vision(self, user_message, image_url=None, temperature=0.7, max_response_tokens=500):
-        """Send message with optional image for vision models - UPDATED with configurable tokens"""
+        """Send message with optional image for vision models"""
         if not user_message.strip():
             return ""
 
-        # FIXED: Use exact model matching for vision support
         vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-        supports_vision = self.model in vision_models  # EXACT match
-
-        print(f"[LLM] Model: {self.model}, Vision support: {supports_vision}, Has image: {bool(image_url)}")
+        supports_vision = self.model in vision_models
 
         if not supports_vision and image_url:
-            print(f"[LLM] WARNING: {self.model} doesn't support vision. Falling back to text-only.")
             return self.chat(user_message, temperature, max_response_tokens)
 
-        # Create message content with image
         if image_url and supports_vision:
-            print(f"[LLM] Formatting vision request with image (length: {len(image_url)})")
-            # Ensure proper format for vision API
             content = [
                 {
                     "type": "text",
@@ -132,33 +110,29 @@ class LLMManager:
                     "type": "image_url",
                     "image_url": {
                         "url": image_url,
-                        "detail": "high"  # Request high detail analysis
+                        "detail": "high"
                     }
                 }
             ]
         else:
             content = user_message
 
-        # Add user message to history
         self.chat_history.append({
             "role": "user",
             "content": content
         })
 
-        # Manage context
         self.manage_context()
 
         try:
-            print(f"[LLM] Sending request to OpenAI API...")
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=self.chat_history,
                 temperature=temperature,
-                max_tokens=max_response_tokens  # Now configurable
+                max_tokens=max_response_tokens
             )
 
             assistant_message = response.choices[0].message.content
-            print(f"[LLM] Received response: {assistant_message[:100]}...")
 
             self.chat_history.append({
                 "role": "assistant",
@@ -168,11 +142,7 @@ class LLMManager:
             return assistant_message
 
         except Exception as e:
-            import traceback
-            error_details = traceback.format_exc()
             error_msg = f"Error getting vision response: {e}"
-            print(f"[LLM] {error_msg}")
-            print(f"[LLM] Full traceback: {error_details}")
             return error_msg
 
     def reset_conversation(self, system_prompt=None):

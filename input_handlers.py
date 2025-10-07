@@ -1,5 +1,6 @@
 ﻿"""
-Input Handlers - Twitch Chat, Microphone, Screen Capture
+Input Handlers - PRODUCTION BUILD (No Console Output)
+Twitch Chat, Microphone, Screen Capture
 """
 
 import os
@@ -12,7 +13,6 @@ from io import BytesIO
 import socket
 
 
-# Twitch IRC Handler
 class TwitchChatHandler:
     def __init__(self, channel, oauth_token=None):
         """Initialize Twitch chat connection"""
@@ -23,7 +23,6 @@ class TwitchChatHandler:
         self.connection = None
         self.thread = None
 
-        # Twitch IRC settings
         self.server = 'irc.chat.twitch.tv'
         self.port = 6667
         self.nickname = 'chatbot'
@@ -36,7 +35,6 @@ class TwitchChatHandler:
         self.running = True
         self.thread = threading.Thread(target=self._connect_and_listen, daemon=True)
         self.thread.start()
-        print(f"[Twitch] Started listening to #{self.channel}")
 
     def stop(self):
         """Stop listening to Twitch chat"""
@@ -46,16 +44,13 @@ class TwitchChatHandler:
                 self.connection.close()
             except:
                 pass
-        print("[Twitch] Stopped")
 
     def _connect_and_listen(self):
         """Connect to Twitch IRC and listen for messages"""
         try:
-            # Create socket connection
             self.connection = socket.socket()
             self.connection.connect((self.server, self.port))
 
-            # Authenticate
             if self.oauth_token:
                 self.connection.send(f"PASS {self.oauth_token}\r\n".encode('utf-8'))
             else:
@@ -64,37 +59,28 @@ class TwitchChatHandler:
             self.connection.send(f"NICK {self.nickname}\r\n".encode('utf-8'))
             self.connection.send(f"JOIN #{self.channel}\r\n".encode('utf-8'))
 
-            print(f"[Twitch] Connected to #{self.channel}")
-
-            # Listen for messages
             while self.running:
                 try:
                     response = self.connection.recv(2048).decode('utf-8')
 
                     if response.startswith('PING'):
-                        # Respond to ping
                         self.connection.send("PONG :tmi.twitch.tv\r\n".encode('utf-8'))
 
                     elif 'PRIVMSG' in response:
-                        # Parse chat message
                         username = response.split('!')[0][1:]
                         message = response.split('PRIVMSG')[1].split(':')[1].strip()
 
-                        # Add to queue
                         self.message_queue.put({
                             'username': username,
                             'message': message
                         })
 
-                        print(f"[Twitch] {username}: {message}")
-
-                except Exception as e:
+                except Exception:
                     if self.running:
-                        print(f"[Twitch] Error receiving: {e}")
-                    break
+                        break
 
-        except Exception as e:
-            print(f"[Twitch] Connection error: {e}")
+        except Exception:
+            pass
 
     def get_message(self):
         """Get next message from queue (non-blocking)"""
@@ -108,7 +94,6 @@ class TwitchChatHandler:
         return not self.message_queue.empty()
 
 
-# Microphone Handler
 class MicrophoneHandler:
     def __init__(self):
         """Initialize microphone handler"""
@@ -116,57 +101,41 @@ class MicrophoneHandler:
         self.microphone = None
         self.is_available = False
 
-        # Try to initialize microphone
         try:
             self.microphone = sr.Microphone()
 
-            # Adjust for ambient noise
-            print("[Mic] Calibrating microphone...")
             with self.microphone as source:
                 self.recognizer.adjust_for_ambient_noise(source, duration=1)
-            print("[Mic] Ready!")
+
             self.is_available = True
 
-        except Exception as e:
-            print(f"[Mic] Warning: Microphone not available - {e}")
-            print("[Mic] Voice input will be disabled")
+        except Exception:
             self.is_available = False
 
     def listen_once(self, timeout=10):
         """Listen for speech and return transcribed text"""
         if not self.is_available:
-            print("[Mic] Microphone not available")
             return None
 
         try:
-            print("[Mic] Listening...")
             with self.microphone as source:
                 audio = self.recognizer.listen(source, timeout=timeout, phrase_time_limit=10)
 
-            print("[Mic] Processing speech...")
-
-            # Try Google Speech Recognition (free)
             try:
                 text = self.recognizer.recognize_google(audio)
-                print(f"[Mic] Recognized: {text}")
                 return text
             except sr.UnknownValueError:
-                print("[Mic] Could not understand audio")
                 return None
-            except sr.RequestError as e:
-                print(f"[Mic] Recognition error: {e}")
+            except sr.RequestError:
                 return None
 
         except sr.WaitTimeoutError:
-            print("[Mic] Listening timeout")
             return None
-        except Exception as e:
-            print(f"[Mic] Error: {e}")
+        except Exception:
             return None
 
     def listen_continuous(self, callback, stop_event):
         """Continuously listen and call callback with transcribed text"""
-
         def listen_thread():
             while not stop_event.is_set():
                 text = self.listen_once(timeout=5)
@@ -178,7 +147,6 @@ class MicrophoneHandler:
         return thread
 
 
-# Screen Capture Handler
 class ScreenCaptureHandler:
     def __init__(self):
         """Initialize screen capture handler"""
@@ -187,29 +155,23 @@ class ScreenCaptureHandler:
     def capture_screen(self, region=None):
         """Capture screenshot and return as base64 encoded image"""
         try:
-            # Capture screen
             if region:
-                # region should be (left, top, right, bottom)
                 screenshot = ImageGrab.grab(bbox=region)
             else:
                 screenshot = ImageGrab.grab()
 
-            # Resize if too large (to save tokens)
             max_size = (1024, 1024)
             screenshot.thumbnail(max_size, Image.Resampling.LANCZOS)
 
-            # Convert to base64
             buffered = BytesIO()
             screenshot.save(buffered, format="PNG")
             img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
             self.last_capture = img_base64
 
-            # Return as data URL for OpenAI Vision API
             return f"data:image/png;base64,{img_base64}"
 
-        except Exception as e:
-            print(f"[Screen] Capture error: {e}")
+        except Exception:
             return None
 
     def get_last_capture(self):
@@ -220,12 +182,9 @@ class ScreenCaptureHandler:
 
     def capture_window(self, window_title):
         """Capture specific window (platform-specific)"""
-        # This would require platform-specific code (pygetwindow on Windows)
-        # For now, just capture full screen
         return self.capture_screen()
 
 
-# Combined Input Manager
 class InputManager:
     def __init__(self):
         """Initialize all input handlers"""

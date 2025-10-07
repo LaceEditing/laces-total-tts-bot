@@ -209,3 +209,7 @@ New Text Document.txt
 images/Idle.png
 images/speaking.png
 *.mp3
+ffmpeg.exe
+ffmpeg_binaries/ffmpeg.exe
+ffmpeg_binaries/ffprobe.exe
+ffprobe.exe

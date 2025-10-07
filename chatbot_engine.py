@@ -1,6 +1,6 @@
 ﻿"""
-Chatbot Engine - Enhanced with Audio-Reactive Avatar System
-Avatar responds to actual audio volume levels in real-time
+Chatbot Engine - PRODUCTION BUILD (No Console Output)
+Audio-Reactive Avatar System
 """
 
 import json
@@ -18,6 +18,7 @@ env_file = Path('.env')
 if env_file.exists():
     load_dotenv(env_file)
 
+
 class ChatbotEngine:
     def __init__(self, config_file='chatbot_config.json'):
         """Initialize chatbot engine with audio-reactive avatar"""
@@ -25,31 +26,26 @@ class ChatbotEngine:
         self.history_file = Path('conversation_history.json')
         self.load_config()
 
-        # Components
         self.llm = None
         self.tts = None
         self.inputs = InputManager()
 
-        # State
         self.is_running = False
         self.is_speaking = False
         self.current_thread = None
 
-        # Twitch
         self.twitch_thread = None
         self.twitch_running = False
         self.last_twitch_response_time = 0
         self.current_twitch_username = None
         self.current_twitch_message = None
 
-        # Avatar window
         self.avatar_window = None
 
-        # Callbacks
         self.on_response_callback = None
         self.on_speaking_start = None
         self.on_speaking_end = None
-        self.on_volume_update = None  # NEW: For audio meter updates
+        self.on_volume_update = None
 
     def load_config(self):
         """Load configuration"""
@@ -75,7 +71,7 @@ class ChatbotEngine:
             'speaking_image': '',
             'idle_image': '',
             'max_context_tokens': 8000,
-            'volume_threshold': 0.02,  # NEW: Audio sensitivity
+            'volume_threshold': 0.02,
             'elevenlabs_stability': 0.5,
             'elevenlabs_similarity': 0.75,
             'elevenlabs_style': 0.0,
@@ -96,7 +92,6 @@ class ChatbotEngine:
         if self.config['user_name'] != 'User':
             system_prompt += f"\nYou are talking to {self.config['user_name']}."
 
-        # Add response length instructions
         response_length = self.config.get('response_length', 'normal')
         if response_length == 'brief':
             system_prompt += "\n\nIMPORTANT: Keep ALL responses very brief and concise - typically 1-2 sentences (20-40 words max)."
@@ -105,7 +100,6 @@ class ChatbotEngine:
         elif response_length == 'detailed':
             system_prompt += "\n\nProvide thorough, detailed responses - typically 4-8 sentences (80-150 words)."
 
-        # Add response style
         response_style = self.config.get('response_style', 'conversational')
         if response_style == 'custom':
             custom_style = self.config.get('custom_response_style', '')
@@ -137,11 +131,9 @@ class ChatbotEngine:
             elevenlabs_settings=elevenlabs_settings
         )
 
-        # Set volume threshold for audio-reactive avatar
         volume_threshold = self.config.get('volume_threshold', 0.02)
         self.tts.set_volume_threshold(volume_threshold)
 
-        # Set up audio-reactive callbacks
         self.tts.set_audio_callbacks(
             on_start=self._on_audio_start,
             on_active=self._on_audio_active,
@@ -159,7 +151,6 @@ class ChatbotEngine:
             self.inputs.enable_screen()
 
         self._load_images()
-        print("[Engine] Initialized with audio-reactive avatar!")
 
     def _load_images(self):
         """Initialize avatar window"""
@@ -175,13 +166,11 @@ class ChatbotEngine:
                         bg_color='#00FF00',
                         always_on_top=False
                     )
-                    print(f"[Engine] Avatar window created")
                 else:
                     self.avatar_window.load_images(idle_path, speaking_path)
-                    print(f"[Engine] Avatar images updated")
 
-        except Exception as e:
-            print(f"[Engine] Error loading avatar: {e}")
+        except Exception:
+            pass
 
     def start(self):
         """Start the chatbot"""
@@ -189,7 +178,6 @@ class ChatbotEngine:
             self.initialize()
 
         self.is_running = True
-        print(f"[Engine] {self.config['ai_name']} is running with audio-reactive avatar!")
 
         if self.config['twitch_enabled'] and self.inputs.twitch:
             self.start_twitch_polling()
@@ -208,33 +196,27 @@ class ChatbotEngine:
         if self.avatar_window:
             self.avatar_window.hide()
 
-        print("[Engine] Stopped")
-
-    # Audio-reactive callbacks (NEW)
     def _on_audio_start(self):
         """Called when audio playback starts"""
         self.is_speaking = True
-        print("[Engine] 🎬 Audio started")
 
         if self.on_speaking_start:
             self.on_speaking_start()
 
     def _on_audio_active(self):
-        """Called when volume rises above threshold - MOUTH OPENS"""
+        """Called when volume rises above threshold"""
         if self.avatar_window:
             self.avatar_window.show_speaking()
 
-        # Update audio meter if callback exists
         if self.on_volume_update and self.tts:
             volume = self.tts.get_current_volume()
             self.on_volume_update(volume)
 
     def _on_audio_silent(self):
-        """Called when volume drops below threshold - MOUTH CLOSES"""
+        """Called when volume drops below threshold"""
         if self.avatar_window:
             self.avatar_window.show_idle()
 
-        # Update audio meter if callback exists
         if self.on_volume_update and self.tts:
             volume = self.tts.get_current_volume()
             self.on_volume_update(volume)
@@ -242,7 +224,6 @@ class ChatbotEngine:
     def _on_audio_end(self):
         """Called when audio playback ends"""
         self.is_speaking = False
-        print("[Engine] 🎬 Audio finished")
 
         if self.avatar_window:
             self.avatar_window.show_idle()
@@ -255,7 +236,6 @@ class ChatbotEngine:
         self.config['volume_threshold'] = threshold
         if self.tts:
             self.tts.set_volume_threshold(threshold)
-        print(f"[Engine] Volume threshold updated: {threshold:.3f}")
 
     def start_twitch_polling(self):
         """Start polling Twitch chat"""
@@ -265,7 +245,6 @@ class ChatbotEngine:
         self.twitch_running = True
         self.twitch_thread = threading.Thread(target=self._twitch_poll_loop, daemon=True)
         self.twitch_thread.start()
-        print("[Engine] Twitch polling started")
 
     def stop_twitch_polling(self):
         """Stop Twitch polling"""
@@ -303,7 +282,6 @@ class ChatbotEngine:
                             else:
                                 user_input = message
 
-                            print(f"[Engine] Responding to Twitch: {user_input}")
                             self._process_and_respond(user_input)
 
                             self.current_twitch_username = None
@@ -312,8 +290,7 @@ class ChatbotEngine:
 
                 time.sleep(0.5)
 
-            except Exception as e:
-                print(f"[Engine] Twitch error: {e}")
+            except Exception:
                 time.sleep(1)
 
     def _should_respond_to_twitch(self, message):
@@ -340,7 +317,6 @@ class ChatbotEngine:
         if not self.inputs.enabled_inputs['microphone']:
             return
 
-        print("[Engine] Listening...")
         user_text = self.inputs.listen_microphone(timeout=10)
 
         if user_text:
@@ -360,10 +336,7 @@ class ChatbotEngine:
         if not self.is_running:
             return
 
-        print(f"[Engine] Processing: {user_input[:100]}")
-
         try:
-            # Get max tokens based on response length
             response_length = self.config.get('response_length', 'normal')
             if response_length == 'brief':
                 max_tokens = 60
@@ -374,7 +347,6 @@ class ChatbotEngine:
             else:
                 max_tokens = 150
 
-            # Get response from LLM
             model = self.config['llm_model']
             vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
 
@@ -389,8 +361,8 @@ class ChatbotEngine:
             self._speak_response(response)
             self.save_conversation_history()
 
-        except Exception as e:
-            print(f"[Engine] Error: {e}")
+        except Exception:
+            pass
 
     def _speak_response(self, text):
         """Speak response with Twitch context"""
@@ -399,7 +371,6 @@ class ChatbotEngine:
 
         tts_text = text
 
-        # Add Twitch context if applicable
         if self.current_twitch_username or self.current_twitch_message:
             prepend_parts = []
 
@@ -450,8 +421,8 @@ class ChatbotEngine:
                 with open(self.history_file, 'w', encoding='utf-8') as f:
                     json.dump(history_data, f, indent=2, ensure_ascii=False)
 
-            except Exception as e:
-                print(f"[Engine] Error saving history: {e}")
+            except Exception:
+                pass
 
     def set_config(self, key, value):
         """Update config"""

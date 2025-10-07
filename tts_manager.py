@@ -1,11 +1,10 @@
 ﻿"""
-TTS Manager - ENHANCED with Real-Time Audio-Reactive Avatar Switching
-Analyzes actual audio volume levels for natural, responsive mouth animation
+TTS Manager - PRODUCTION BUILD (No Console Output)
+Audio-reactive avatar with suppressed console windows
 """
 
 import os
 import sys
-
 import requests
 from pathlib import Path
 import pygame
@@ -15,61 +14,79 @@ import numpy as np
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 
+# Suppress ALL console output from subprocess (ffmpeg)
+if sys.platform == 'win32':
+    import subprocess
+
+    # CREATE_NO_WINDOW flag
+    CREATE_NO_WINDOW = 0x08000000
+
+    # Store original Popen
+    _original_popen = subprocess.Popen
+
+
+    def _silent_popen(*args, **kwargs):
+        """Completely suppress console windows for all subprocesses"""
+        startupinfo = subprocess.STARTUPINFO()
+        startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+        startupinfo.wShowWindow = subprocess.SW_HIDE
+
+        if 'creationflags' not in kwargs:
+            kwargs['creationflags'] = 0
+        kwargs['creationflags'] |= CREATE_NO_WINDOW
+        kwargs['startupinfo'] = startupinfo
+
+        return _original_popen(*args, **kwargs)
+
+
+    # Monkey-patch subprocess globally
+    subprocess.Popen = _silent_popen
+
+# Set ffmpeg paths for PyInstaller bundle
 if hasattr(sys, '_MEIPASS'):
-    # Running in PyInstaller bundle
     bundle_dir = sys._MEIPASS
     ffmpeg_exe = os.path.join(bundle_dir, 'ffmpeg.exe')
     ffprobe_exe = os.path.join(bundle_dir, 'ffprobe.exe')
 
-    # Set environment variables
     if os.path.exists(ffmpeg_exe):
         os.environ['FFMPEG_BINARY'] = ffmpeg_exe
         os.environ['PATH'] = bundle_dir + os.pathsep + os.environ.get('PATH', '')
-        print(f"[TTS] Using bundled ffmpeg: {ffmpeg_exe}")
-    else:
-        print(f"[TTS] ERROR: Bundled ffmpeg not found at {ffmpeg_exe}")
 
     if os.path.exists(ffprobe_exe):
         os.environ['FFPROBE_BINARY'] = ffprobe_exe
-        print(f"[TTS] Using bundled ffprobe: {ffprobe_exe}")
 
-
-# Import pydub after setting ffmpeg paths
+# Import pydub after setting paths
 try:
     from pydub import AudioSegment
-    from pydub.utils import which
 
-    # Explicitly set pydub's converter path if in bundle
     if hasattr(sys, '_MEIPASS'):
         ffmpeg_path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
         if os.path.exists(ffmpeg_path):
             AudioSegment.converter = ffmpeg_path
-            print(f"[TTS] Set pydub converter to: {ffmpeg_path}")
 
-    # SUPPRESS CONSOLE WINDOWS ON WINDOWS
+    # Additional subprocess suppression for pydub
     if sys.platform == 'win32':
         import subprocess
 
-        # Store original Popen
-        _original_popen = subprocess.Popen
+        _pydub_original = subprocess.Popen
 
 
-        def _silent_popen(*args, **kwargs):
-            """Suppress console windows for ffmpeg subprocesses"""
+        def _pydub_silent(*args, **kwargs):
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
+            kwargs['startupinfo'] = startupinfo
             if 'creationflags' not in kwargs:
                 kwargs['creationflags'] = 0
-            kwargs['creationflags'] |= 0x08000000  # CREATE_NO_WINDOW
-            return _original_popen(*args, **kwargs)
+            kwargs['creationflags'] |= CREATE_NO_WINDOW
+            return _pydub_original(*args, **kwargs)
 
 
-        # Monkey-patch subprocess
-        subprocess.Popen = _silent_popen
-        print("[TTS] Suppressed subprocess console windows")
+        subprocess.Popen = _pydub_silent
 
-    print(f"[TTS] pydub ffmpeg path: {AudioSegment.converter}")
-except Exception as e:
-    print(f"[TTS] Warning: pydub import error: {e}")
+except Exception:
     AudioSegment = None
+
 
 class TTSManager:
     def __init__(self, service='elevenlabs', voice='default', elevenlabs_settings=None):
@@ -79,7 +96,6 @@ class TTSManager:
         self.audio_folder = Path('audio_cache')
         self.audio_folder.mkdir(exist_ok=True)
 
-        # ElevenLabs settings
         self.elevenlabs_settings = elevenlabs_settings or {
             'stability': 0.5,
             'similarity_boost': 0.75,
@@ -87,35 +103,40 @@ class TTSManager:
             'use_speaker_boost': True
         }
 
-        # Hide console windows on Windows
+        # Suppress pygame output
         if sys.platform == 'win32':
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
             os.environ['SDL_AUDIODRIVER'] = 'directsound'
 
-        # Initialize pygame mixer
-        pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
+        # Initialize pygame mixer (suppress output)
+        import io
+        import contextlib
+
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
 
         # Audio monitoring state
         self.is_playing = False
-        self.audio_active = False  # True when volume above threshold
+        self.audio_active = False
         self.monitoring_thread = None
         self.stop_monitoring = False
 
         # Volume detection settings
-        self.volume_threshold = 0.01  # Adjustable sensitivity (0.0-1.0)
-        self.min_speech_duration = 0.05  # Minimum sound duration to trigger (seconds)
-        self.min_silence_duration = 0.1  # Minimum silence duration to trigger (seconds)
+        self.volume_threshold = 0.01
+        self.min_speech_duration = 0.05
+        self.min_silence_duration = 0.1
 
         # Current audio analysis
         self.current_volume = 0.0
-        self.volume_history = []  # For smoothing
+        self.volume_history = []
         self.audio_data = None
 
         # Callbacks for avatar switching
-        self.on_audio_start = None  # Called when audio starts
-        self.on_audio_active = None  # Called when volume rises above threshold
-        self.on_audio_silent = None  # Called when volume drops below threshold
-        self.on_audio_end = None  # Called when audio ends
+        self.on_audio_start = None
+        self.on_audio_active = None
+        self.on_audio_silent = None
+        self.on_audio_end = None
 
         # Initialize service-specific clients
         if service == 'elevenlabs':
@@ -126,16 +147,12 @@ class TTSManager:
     def set_volume_threshold(self, threshold):
         """Set the volume threshold for speech detection (0.0-1.0)"""
         self.volume_threshold = max(0.0, min(1.0, threshold))
-        print(f"[TTS] Volume threshold set to {self.volume_threshold:.3f}")
 
     def speak(self, text, callback_on_start=None, callback_on_end=None):
         """Convert text to speech and play with audio-reactive monitoring"""
         if not text.strip():
             return
 
-        print(f"[TTS] Speaking with {self.service}: {text[:50]}...")
-
-        # Generate audio
         audio_file = None
         try:
             if self.service == 'elevenlabs':
@@ -147,96 +164,61 @@ class TTSManager:
             elif self.service == 'azure':
                 audio_file = self._azure_tts(text)
             else:
-                print(f"Unknown TTS service: {self.service}")
                 return
 
-            # Play audio with real-time monitoring
             if audio_file and audio_file.exists():
                 if callback_on_start:
                     callback_on_start()
 
-                # Pre-analyze audio file for volume levels
                 self._analyze_audio_file(audio_file)
-
-                # Play with real-time volume monitoring
                 self._play_audio_with_volume_monitoring(audio_file)
 
                 if callback_on_end:
                     callback_on_end()
 
-        except Exception as e:
-            print(f"TTS Error: {e}")
+        except Exception:
             if callback_on_end:
                 callback_on_end()
 
     def _analyze_audio_file(self, audio_file):
         """Analyze audio file to extract volume envelope"""
         try:
-            print(f"[TTS] Analyzing audio file: {audio_file}")
-            print(f"[TTS] File exists: {audio_file.exists()}")
-            print(f"[TTS] File size: {audio_file.stat().st_size if audio_file.exists() else 'N/A'}")
-
-            # Convert mp3 to wav if needed for analysis
             if audio_file.suffix == '.mp3':
-                # For MP3, we'll use pydub if available
                 try:
                     if AudioSegment is None:
-                        print("[TTS] ERROR: AudioSegment not available, cannot analyze MP3")
                         self.audio_data = None
                         return
 
-                    print(f"[TTS] Loading MP3 with pydub...")
-                    print(f"[TTS] Using ffmpeg: {AudioSegment.converter}")
-
                     audio = AudioSegment.from_mp3(str(audio_file))
-                    print(f"[TTS]  MP3 loaded successfully!")
-                    print(f"[TTS] Duration: {len(audio)}ms, Frame rate: {audio.frame_rate}Hz")
-
                     samples = np.array(audio.get_array_of_samples())
                     sample_rate = audio.frame_rate
 
-                    # Normalize to -1.0 to 1.0
-                    if audio.sample_width == 2:  # 16-bit
+                    if audio.sample_width == 2:
                         samples = samples / 32768.0
-                    elif audio.sample_width == 1:  # 8-bit
+                    elif audio.sample_width == 1:
                         samples = samples / 128.0
 
-                except FileNotFoundError as e:
-                    print(f"[TTS] ERROR: ffmpeg not found! {e}")
-                    print(f"[TTS] FFMPEG_BINARY env var: {os.environ.get('FFMPEG_BINARY', 'NOT SET')}")
-                    print(f"[TTS] AudioSegment.converter: {AudioSegment.converter if AudioSegment else 'N/A'}")
-                    self.audio_data = None
-                    return
-                except Exception as e:
-                    print(f"[TTS] ERROR loading MP3: {e}")
-                    import traceback
-                    traceback.print_exc()
+                except Exception:
                     self.audio_data = None
                     return
             else:
-                # Load WAV directly
                 try:
                     from scipy.io import wavfile
                     sample_rate, samples = wavfile.read(str(audio_file))
-                    print(f"[TTS] WAV loaded successfully!")
 
-                    # Normalize to -1.0 to 1.0
                     if samples.dtype == np.int16:
                         samples = samples / 32768.0
                     elif samples.dtype == np.int8:
                         samples = samples / 128.0
-                except Exception as e:
-                    print(f"[TTS] ERROR loading WAV: {e}")
+                except Exception:
                     self.audio_data = None
                     return
 
-            # Handle stereo (take mean of channels)
             if len(samples.shape) > 1:
                 samples = np.mean(samples, axis=1)
 
-            # Calculate RMS (volume) in small windows
-            window_size = int(sample_rate * 0.02)  # 20ms windows
-            hop_size = int(sample_rate * 0.01)  # 10ms hop
+            window_size = int(sample_rate * 0.02)
+            hop_size = int(sample_rate * 0.01)
 
             volume_envelope = []
             for i in range(0, len(samples) - window_size, hop_size):
@@ -244,21 +226,14 @@ class TTSManager:
                 rms = np.sqrt(np.mean(window ** 2))
                 volume_envelope.append(rms)
 
-            # Store analysis results
             self.audio_data = {
                 'volume_envelope': volume_envelope,
                 'sample_rate': sample_rate,
-                'window_duration': 0.01,  # 10ms per window
+                'window_duration': 0.01,
                 'max_volume': max(volume_envelope) if volume_envelope else 1.0
             }
 
-            print(
-                f"[TTS] Audio analyzed: {len(volume_envelope)} windows, max volume: {self.audio_data['max_volume']:.3f}")
-
-        except Exception as e:
-            print(f"[TTS] ERROR in audio analysis: {e}")
-            import traceback
-            traceback.print_exc()
+        except Exception:
             self.audio_data = None
 
     def _play_audio_with_volume_monitoring(self, audio_file):
@@ -271,11 +246,9 @@ class TTSManager:
             self.audio_active = False
             self.volume_history = []
 
-            # Trigger start callback
             if self.on_audio_start:
                 self.on_audio_start()
 
-            # Start monitoring thread
             self.stop_monitoring = False
             self.monitoring_thread = threading.Thread(
                 target=self._monitor_volume_realtime,
@@ -283,11 +256,9 @@ class TTSManager:
             )
             self.monitoring_thread.start()
 
-            # Wait for playback to complete
             while pygame.mixer.music.get_busy():
-                pygame.time.Clock().tick(100)  # Check 100 times per second
+                pygame.time.Clock().tick(100)
 
-            # Stop monitoring
             self.stop_monitoring = True
             if self.monitoring_thread:
                 self.monitoring_thread.join(timeout=0.5)
@@ -295,84 +266,63 @@ class TTSManager:
             self.is_playing = False
             self.audio_active = False
 
-            # Trigger end callback
             if self.on_audio_end:
                 self.on_audio_end()
 
-        except Exception as e:
-            print(f"Audio playback error: {e}")
+        except Exception:
             self.is_playing = False
             self.audio_active = False
 
     def _monitor_volume_realtime(self):
         """Monitor audio volume in real-time and trigger callbacks"""
-        last_state = False  # False = silent, True = active
+        last_state = False
         state_start_time = time.time()
 
         while not self.stop_monitoring and self.is_playing:
             try:
-                # Get current playback position
-                playback_pos = pygame.mixer.music.get_pos() / 1000.0  # Convert ms to seconds
-
-                # Get volume at current position from analysis
+                playback_pos = pygame.mixer.music.get_pos() / 1000.0
                 volume = self._get_volume_at_position(playback_pos)
                 self.current_volume = volume
 
-                # Add to history for smoothing
                 self.volume_history.append(volume)
                 if len(self.volume_history) > 5:
                     self.volume_history.pop(0)
 
-                # Use smoothed volume
                 smoothed_volume = np.mean(self.volume_history)
-
-                # Determine if audio is active (above threshold)
                 is_active = smoothed_volume > self.volume_threshold
 
-                # Check for state changes with minimum duration requirements
                 current_time = time.time()
                 state_duration = current_time - state_start_time
 
                 if is_active != last_state:
-                    # State is changing - check minimum duration
                     if is_active and state_duration >= self.min_silence_duration:
-                        # Silent -> Active (mouth opens)
                         self.audio_active = True
                         if self.on_audio_active:
                             self.on_audio_active()
-                        print(f"[TTS] 🎤 ACTIVE (volume: {smoothed_volume:.3f})")
                         last_state = True
                         state_start_time = current_time
 
                     elif not is_active and state_duration >= self.min_speech_duration:
-                        # Active -> Silent (mouth closes)
                         self.audio_active = False
                         if self.on_audio_silent:
                             self.on_audio_silent()
-                        print(f"[TTS] 🤐 SILENT (volume: {smoothed_volume:.3f})")
                         last_state = False
                         state_start_time = current_time
 
-                # Check frequently for responsive animation
-                time.sleep(0.01)  # 10ms = 100 checks per second
+                time.sleep(0.01)
 
-            except Exception as e:
-                print(f"[TTS] Monitoring error: {e}")
+            except Exception:
                 break
 
     def _get_volume_at_position(self, position):
         """Get volume level at specific playback position"""
         if not self.audio_data:
-            # Fallback: assume constant volume
             return 0.5
 
-        # Calculate window index
         window_idx = int(position / self.audio_data['window_duration'])
-
-        # Get volume from envelope
         envelope = self.audio_data['volume_envelope']
+
         if 0 <= window_idx < len(envelope):
-            # Normalize by max volume
             normalized = envelope[window_idx] / self.audio_data['max_volume']
             return normalized
 
@@ -383,20 +333,12 @@ class TTSManager:
         return self.current_volume
 
     def set_audio_callbacks(self, on_start=None, on_active=None, on_silent=None, on_end=None):
-        """
-        Set callbacks for audio-reactive events
-
-        on_start: Called when audio playback starts
-        on_active: Called when volume rises above threshold (mouth opens)
-        on_silent: Called when volume drops below threshold (mouth closes)
-        on_end: Called when audio playback ends
-        """
+        """Set callbacks for audio-reactive events"""
         self.on_audio_start = on_start
         self.on_audio_active = on_active
         self.on_audio_silent = on_silent
         self.on_audio_end = on_end
 
-    # [Previous TTS generation methods remain the same]
     def _elevenlabs_tts(self, text):
         """Generate speech using ElevenLabs"""
         try:
@@ -426,8 +368,7 @@ class TTSManager:
 
             return audio_file
 
-        except Exception as e:
-            print(f"ElevenLabs TTS error: {e}")
+        except Exception:
             return None
 
     def _streamelements_tts(self, text):
@@ -449,8 +390,7 @@ class TTSManager:
 
             return audio_file
 
-        except Exception as e:
-            print(f"StreamElements TTS error: {e}")
+        except Exception:
             return None
 
     def _coqui_tts(self, text):
@@ -458,15 +398,14 @@ class TTSManager:
         try:
             from TTS.api import TTS
             tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC",
-                     progress_bar=False, gpu=False)
+                      progress_bar=False, gpu=False)
 
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'coqui_{timestamp}.wav'
             tts.tts_to_file(text=text, file_path=str(audio_file))
             return audio_file
 
-        except Exception as e:
-            print(f"Coqui TTS error: {e}")
+        except Exception:
             return None
 
     def _azure_tts(self, text):
@@ -495,8 +434,7 @@ class TTSManager:
                 return audio_file
             return None
 
-        except Exception as e:
-            print(f"Azure TTS error: {e}")
+        except Exception:
             return None
 
     def stop(self):
