@@ -2,6 +2,8 @@
 Complete AI Chatbot System - Integrated Application
 UPDATED: Added Twitch TTS output controls for reading username and message
 """
+import os
+import sys
 import time
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
@@ -11,9 +13,8 @@ import threading
 from pathlib import Path
 from chatbot_engine import ChatbotEngine
 from PIL import Image, ImageTk
-import os
-import sys
 from dotenv import load_dotenv, set_key
+
 
 def get_resource_path(relative_path):
     """Get path that works in both script and PyInstaller exe"""
@@ -128,12 +129,57 @@ class IntegratedChatbotApp:
     def set_window_icon(self):
         """Set window and taskbar icons"""
         try:
-            icon_path = Path('icon.ico')
-            if icon_path.exists():
-                self.root.iconbitmap(str(icon_path.absolute()))
-                print("[App] Window icon loaded from icon.ico")
+            # Get icon path - works in both dev and bundled
+            if hasattr(sys, '_MEIPASS'):
+                # Running as bundled .exe
+                icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
             else:
-                print("[App] icon.ico not found - using default icon")
+                # Running in development
+                icon_path = 'icon.ico'
+
+            if os.path.exists(icon_path):
+                # Method 1: Standard tkinter (window title bar)
+                self.root.iconbitmap(str(icon_path))
+
+                # Method 2: Force taskbar icon (Windows-specific)
+                if sys.platform == 'win32':
+                    try:
+                        import ctypes
+
+                        # Get window handle
+                        hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+
+                        # Load icon
+                        icon_flags = 0x00000000  # LR_DEFAULTSIZE
+                        hicon = ctypes.windll.user32.LoadImageW(
+                            0,  # hInst (0 = load from file)
+                            str(icon_path),
+                            1,  # IMAGE_ICON
+                            0, 0,  # width, height (0 = default)
+                            0x00000010  # LR_LOADFROMFILE
+                        )
+
+                        if hicon:
+                            # Set both small and large icons
+                            ctypes.windll.user32.SendMessageW(
+                                hwnd, 0x0080, 0, hicon  # WM_SETICON, ICON_SMALL
+                            )
+                            ctypes.windll.user32.SendMessageW(
+                                hwnd, 0x0080, 1, hicon  # WM_SETICON, ICON_LARGE
+                            )
+
+                            # Force taskbar to update
+                            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                                "LaceAI.Chatbot.1.0"
+                            )
+
+                            print(f"[App] ✅ Taskbar icon set via Windows API")
+                    except Exception as e:
+                        print(f"[App] Could not set taskbar icon via API: {e}")
+
+                print(f"[App] Window icon loaded from: {icon_path}")
+            else:
+                print(f"[App] icon.ico not found at: {icon_path}")
         except Exception as e:
             print(f"[App] Could not set window icon: {e}")
 

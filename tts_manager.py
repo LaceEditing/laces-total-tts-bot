@@ -15,6 +15,62 @@ import numpy as np
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 
+if hasattr(sys, '_MEIPASS'):
+    # Running in PyInstaller bundle
+    bundle_dir = sys._MEIPASS
+    ffmpeg_exe = os.path.join(bundle_dir, 'ffmpeg.exe')
+    ffprobe_exe = os.path.join(bundle_dir, 'ffprobe.exe')
+
+    # Set environment variables
+    if os.path.exists(ffmpeg_exe):
+        os.environ['FFMPEG_BINARY'] = ffmpeg_exe
+        os.environ['PATH'] = bundle_dir + os.pathsep + os.environ.get('PATH', '')
+        print(f"[TTS] Using bundled ffmpeg: {ffmpeg_exe}")
+    else:
+        print(f"[TTS] ERROR: Bundled ffmpeg not found at {ffmpeg_exe}")
+
+    if os.path.exists(ffprobe_exe):
+        os.environ['FFPROBE_BINARY'] = ffprobe_exe
+        print(f"[TTS] Using bundled ffprobe: {ffprobe_exe}")
+
+
+# Import pydub after setting ffmpeg paths
+try:
+    from pydub import AudioSegment
+    from pydub.utils import which
+
+    # Explicitly set pydub's converter path if in bundle
+    if hasattr(sys, '_MEIPASS'):
+        ffmpeg_path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
+        if os.path.exists(ffmpeg_path):
+            AudioSegment.converter = ffmpeg_path
+            print(f"[TTS] Set pydub converter to: {ffmpeg_path}")
+
+    # SUPPRESS CONSOLE WINDOWS ON WINDOWS
+    if sys.platform == 'win32':
+        import subprocess
+
+        # Store original Popen
+        _original_popen = subprocess.Popen
+
+
+        def _silent_popen(*args, **kwargs):
+            """Suppress console windows for ffmpeg subprocesses"""
+            if 'creationflags' not in kwargs:
+                kwargs['creationflags'] = 0
+            kwargs['creationflags'] |= 0x08000000  # CREATE_NO_WINDOW
+            return _original_popen(*args, **kwargs)
+
+
+        # Monkey-patch subprocess
+        subprocess.Popen = _silent_popen
+        print("[TTS] Suppressed subprocess console windows")
+
+    print(f"[TTS] pydub ffmpeg path: {AudioSegment.converter}")
+except Exception as e:
+    print(f"[TTS] Warning: pydub import error: {e}")
+    AudioSegment = None
+
 class TTSManager:
     def __init__(self, service='elevenlabs', voice='default', elevenlabs_settings=None):
         """Initialize TTS manager with audio-reactive capabilities"""
@@ -116,21 +172,26 @@ class TTSManager:
     def _analyze_audio_file(self, audio_file):
         """Analyze audio file to extract volume envelope"""
         try:
-            # Load audio file with pygame
-            sound = pygame.mixer.Sound(str(audio_file))
-
-            # Get raw audio data
-            # Note: pygame doesn't provide easy access to raw data, so we'll use numpy
-            # to load the file directly for analysis
-            from scipy.io import wavfile
-            import wave
+            print(f"[TTS] Analyzing audio file: {audio_file}")
+            print(f"[TTS] File exists: {audio_file.exists()}")
+            print(f"[TTS] File size: {audio_file.stat().st_size if audio_file.exists() else 'N/A'}")
 
             # Convert mp3 to wav if needed for analysis
             if audio_file.suffix == '.mp3':
                 # For MP3, we'll use pydub if available
                 try:
-                    from pydub import AudioSegment
+                    if AudioSegment is None:
+                        print("[TTS] ERROR: AudioSegment not available, cannot analyze MP3")
+                        self.audio_data = None
+                        return
+
+                    print(f"[TTS] Loading MP3 with pydub...")
+                    print(f"[TTS] Using ffmpeg: {AudioSegment.converter}")
+
                     audio = AudioSegment.from_mp3(str(audio_file))
+                    print(f"[TTS]  MP3 loaded successfully!")
+                    print(f"[TTS] Duration: {len(audio)}ms, Frame rate: {audio.frame_rate}Hz")
+
                     samples = np.array(audio.get_array_of_samples())
                     sample_rate = audio.frame_rate
 
@@ -140,21 +201,32 @@ class TTSManager:
                     elif audio.sample_width == 1:  # 8-bit
                         samples = samples / 128.0
 
-                except ImportError:
-                    print("[TTS] pydub not available, using basic monitoring")
+                except FileNotFoundError as e:
+                    print(f"[TTS] ERROR: ffmpeg not found! {e}")
+                    print(f"[TTS] FFMPEG_BINARY env var: {os.environ.get('FFMPEG_BINARY', 'NOT SET')}")
+                    print(f"[TTS] AudioSegment.converter: {AudioSegment.converter if AudioSegment else 'N/A'}")
+                    self.audio_data = None
+                    return
+                except Exception as e:
+                    print(f"[TTS] ERROR loading MP3: {e}")
+                    import traceback
+                    traceback.print_exc()
                     self.audio_data = None
                     return
             else:
                 # Load WAV directly
                 try:
+                    from scipy.io import wavfile
                     sample_rate, samples = wavfile.read(str(audio_file))
+                    print(f"[TTS] WAV loaded successfully!")
+
                     # Normalize to -1.0 to 1.0
                     if samples.dtype == np.int16:
                         samples = samples / 32768.0
                     elif samples.dtype == np.int8:
                         samples = samples / 128.0
-                except:
-                    print("[TTS] Could not load audio for analysis")
+                except Exception as e:
+                    print(f"[TTS] ERROR loading WAV: {e}")
                     self.audio_data = None
                     return
 
@@ -168,8 +240,8 @@ class TTSManager:
 
             volume_envelope = []
             for i in range(0, len(samples) - window_size, hop_size):
-                window = samples[i:i+window_size]
-                rms = np.sqrt(np.mean(window**2))
+                window = samples[i:i + window_size]
+                rms = np.sqrt(np.mean(window ** 2))
                 volume_envelope.append(rms)
 
             # Store analysis results
@@ -180,10 +252,13 @@ class TTSManager:
                 'max_volume': max(volume_envelope) if volume_envelope else 1.0
             }
 
-            print(f"[TTS] Audio analyzed: {len(volume_envelope)} windows, max volume: {self.audio_data['max_volume']:.3f}")
+            print(
+                f"[TTS] Audio analyzed: {len(volume_envelope)} windows, max volume: {self.audio_data['max_volume']:.3f}")
 
         except Exception as e:
-            print(f"[TTS] Audio analysis error: {e}")
+            print(f"[TTS] ERROR in audio analysis: {e}")
+            import traceback
+            traceback.print_exc()
             self.audio_data = None
 
     def _play_audio_with_volume_monitoring(self, audio_file):
