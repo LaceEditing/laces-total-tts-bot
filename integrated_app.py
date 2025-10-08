@@ -40,15 +40,14 @@ class IntegratedChatbotApp:
             self.create_default_env_file()
             load_dotenv(self.env_file)
 
-        # DARK MODE RED THEME - Pleasant and readable
+        # LAVENDER THEME - Original colors
         self.colors = {
-            'bg': '#0A0A0A',          # Very dark red-black background
-            'fg': '#FFE4E4',          # Light cream/pink text
-            'accent': '#FF7B7B',      # Bright coral red
-            'button': '#C73E3E',      # Medium red for buttons
-            'entry_bg': '#2D1515',    # Slightly lighter dark red
-            'text_bg': '#0F0F0F',     # Very dark red for text areas
-            'highlight': '#FF4444'    # Bright red for highlights
+            'bg': '#E6E6FA',
+            'fg': '#4B0082',
+            'accent': '#9370DB',
+            'button': '#8A7BC4',
+            'entry_bg': '#F8F8FF',
+            'text_bg': '#FFFFFF'
         }
 
         # Load custom UI font
@@ -303,7 +302,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.chat_display.tag_config('welcome', foreground=self.colors['accent'], font=self.ui_font)
         self.chat_display.tag_config('header', foreground=self.colors['fg'], font=self.ui_font_bold)
-        self.chat_display.tag_config('system', foreground=self.colors['highlight'], font=('Consolas', 10, 'italic'))
+        self.chat_display.tag_config('system', foreground='#FF6B6B', font=('Consolas', 10, 'italic'))
 
         scrollbar = tk.Scrollbar(
             self.chat_display,
