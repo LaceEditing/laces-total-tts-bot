@@ -142,7 +142,6 @@ class IntegratedChatbotApp:
                 self.root.iconbitmap(str(icon_path))
 
                 # Method 2: Force taskbar icon (Windows-specific)
-                # CRITICAL: Must be called AFTER window is visible
                 if sys.platform == 'win32':
                     # Schedule icon setting after window is fully created
                     self.root.after(100, lambda: self._set_taskbar_icon(icon_path))
