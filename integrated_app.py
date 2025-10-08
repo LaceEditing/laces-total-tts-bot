@@ -1,6 +1,6 @@
 ﻿"""
 Complete AI Chatbot System - Integrated Application
-UPDATED: Added Twitch TTS output controls for reading username and message
+UPDATED: Dark Mode Red Theme + Quicksand Font Fixed
 """
 import os
 import sys
@@ -40,13 +40,15 @@ class IntegratedChatbotApp:
             self.create_default_env_file()
             load_dotenv(self.env_file)
 
+        # DARK MODE RED THEME - Pleasant and readable
         self.colors = {
-            'bg': '#E6E6FA',
-            'fg': '#4B0082',
-            'accent': '#9370DB',
-            'button': '#8A7BC4',
-            'entry_bg': '#F8F8FF',
-            'text_bg': '#FFFFFF'
+            'bg': '#0A0A0A',          # Very dark red-black background
+            'fg': '#FFE4E4',          # Light cream/pink text
+            'accent': '#FF7B7B',      # Bright coral red
+            'button': '#C73E3E',      # Medium red for buttons
+            'entry_bg': '#2D1515',    # Slightly lighter dark red
+            'text_bg': '#0F0F0F',     # Very dark red for text areas
+            'highlight': '#FF4444'    # Bright red for highlights
         }
 
         # Load custom UI font
@@ -127,23 +129,17 @@ class IntegratedChatbotApp:
             return ('Arial', size, weight)
 
     def set_window_icon(self):
-        """Set window and taskbar icons - FIXED for proper taskbar display"""
+        """Set window and taskbar icons"""
         try:
-            # Get icon path - works in both dev and bundled
             if hasattr(sys, '_MEIPASS'):
-                # Running as bundled .exe
                 icon_path = os.path.join(sys._MEIPASS, 'icon.ico')
             else:
-                # Running in development
                 icon_path = 'icon.ico'
 
             if os.path.exists(icon_path):
-                # Method 1: Standard tkinter (window title bar)
                 self.root.iconbitmap(str(icon_path))
 
-                # Method 2: Force taskbar icon (Windows-specific)
                 if sys.platform == 'win32':
-                    # Schedule icon setting after window is fully created
                     self.root.after(100, lambda: self._set_taskbar_icon(icon_path))
 
                 print(f"[App] Window icon loaded from: {icon_path}")
@@ -153,44 +149,29 @@ class IntegratedChatbotApp:
             print(f"[App] Could not set window icon: {e}")
 
     def _set_taskbar_icon(self, icon_path):
-        """Set taskbar icon using Windows API - called after window creation"""
+        """Set taskbar icon using Windows API"""
         try:
             import ctypes
             from ctypes import wintypes
 
-            # Force window to update and ensure it's visible
             self.root.update_idletasks()
-
-            # Get the actual window handle (NOT parent)
             hwnd = ctypes.windll.user32.FindWindowW(None, self.root.title())
 
-            # If FindWindowW fails, try getting from winfo_id
             if not hwnd:
                 hwnd = self.root.winfo_id()
 
             if hwnd:
-                # Load icon with proper flags
                 LR_LOADFROMFILE = 0x00000010
                 IMAGE_ICON = 1
 
-                # Load icon - specify 16x16 for small, 32x32 for large
                 hicon_small = ctypes.windll.user32.LoadImageW(
-                    None,
-                    icon_path,
-                    IMAGE_ICON,
-                    16, 16,  # Small icon size
-                    LR_LOADFROMFILE
+                    None, icon_path, IMAGE_ICON, 16, 16, LR_LOADFROMFILE
                 )
 
                 hicon_large = ctypes.windll.user32.LoadImageW(
-                    None,
-                    icon_path,
-                    IMAGE_ICON,
-                    32, 32,  # Large icon size
-                    LR_LOADFROMFILE
+                    None, icon_path, IMAGE_ICON, 32, 32, LR_LOADFROMFILE
                 )
 
-                # Set both icons
                 WM_SETICON = 0x0080
                 ICON_SMALL = 0
                 ICON_LARGE = 1
@@ -201,7 +182,6 @@ class IntegratedChatbotApp:
                 if hicon_large:
                     ctypes.windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_LARGE, hicon_large)
 
-                # Set AppUserModelID to override taskbar grouping
                 try:
                     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("LaceAI.Chatbot.1.0")
                 except:
@@ -260,7 +240,7 @@ TWITCH_OAUTH_TOKEN=
         subtitle = tk.Label(
             title_frame,
             text="Talk to fake voices in your head!",
-            font=('Arial', 10, 'italic'),
+            font=(self.ui_font[0], 10, 'italic'),
             bg=self.colors['bg'],
             fg=self.colors['accent']
         )
@@ -277,13 +257,13 @@ TWITCH_OAUTH_TOKEN=
                        background=self.colors['button'],
                        foreground='white',
                        padding=[15, 8],
-                       font=('Arial', 10))
+                       font=self.ui_font)
 
         style.map('TNotebook.Tab',
                  background=[('selected', self.colors['accent'])],
                  foreground=[('selected', 'white')],
                  padding=[('selected', [18, 12])],
-                 font=[('selected', ('Arial', 11, 'bold'))])
+                 font=[('selected', self.ui_font_bold)])
 
         notebook = ttk.Notebook(notebook_container)
         notebook.pack(fill='both', expand=True)
@@ -300,7 +280,7 @@ TWITCH_OAUTH_TOKEN=
     def create_chat_tab(self, notebook):
         """Chat interface tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='Chat')
+        notebook.add(tab, text='💬 Chat')
 
         container = tk.Frame(tab, bg=self.colors['bg'])
         container.pack(fill='both', expand=True, padx=25, pady=20)
@@ -321,9 +301,9 @@ TWITCH_OAUTH_TOKEN=
         )
         self.chat_display.pack(fill='both', expand=True, padx=2, pady=2)
 
-        self.chat_display.tag_config('welcome', foreground=self.colors['accent'], font=('Arial', 10))
-        self.chat_display.tag_config('header', foreground=self.colors['fg'], font=('Arial', 12, 'bold'))
-        self.chat_display.tag_config('system', foreground='#FF6B6B', font=('Consolas', 10, 'italic'))
+        self.chat_display.tag_config('welcome', foreground=self.colors['accent'], font=self.ui_font)
+        self.chat_display.tag_config('header', foreground=self.colors['fg'], font=self.ui_font_bold)
+        self.chat_display.tag_config('system', foreground=self.colors['highlight'], font=('Consolas', 10, 'italic'))
 
         scrollbar = tk.Scrollbar(
             self.chat_display,
@@ -346,7 +326,7 @@ TWITCH_OAUTH_TOKEN=
             text="Send a message below to test the bot's responses",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         )
         self.chat_mode_label.pack(anchor='w', pady=(0, 8))
 
@@ -360,9 +340,10 @@ TWITCH_OAUTH_TOKEN=
             entry_border,
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 12),
+            font=self.ui_font_large,
             relief='flat',
-            bd=0
+            bd=0,
+            insertbackground=self.colors['fg']
         )
         self.text_input.pack(fill='x', padx=2, pady=2, ipady=6)
         self.text_input.bind('<Return>', lambda e: self.send_text_message())
@@ -373,7 +354,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.send_text_message,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -387,7 +368,7 @@ TWITCH_OAUTH_TOKEN=
             text="Cool Gamer Tip: You can test bot's responses here anytime, even before starting the full chatbot",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         )
         tip_label.pack(anchor='w', pady=(8, 0))
 
@@ -430,7 +411,7 @@ TWITCH_OAUTH_TOKEN=
     def create_api_keys_tab(self, notebook):
         """API Keys management tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='API Keys')
+        notebook.add(tab, text='🔑 API Keys')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -449,7 +430,7 @@ TWITCH_OAUTH_TOKEN=
             text=info_text,
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10),
+            font=self.ui_font,
             justify='left'
         ).pack(padx=20, pady=20)
 
@@ -498,14 +479,16 @@ TWITCH_OAUTH_TOKEN=
             text="Azure Region:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).pack(side='left', padx=5)
 
         self.azure_region_entry = tk.Entry(
             azure_region_frame,
             bg=self.colors['entry_bg'],
-            font=('Arial', 10),
-            width=15
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=15,
+            insertbackground=self.colors['fg']
         )
         self.azure_region_entry.pack(side='left', padx=5)
         self.azure_region_entry.insert(0, self.get_api_key('AZURE_TTS_REGION') or 'eastus')
@@ -529,7 +512,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.save_all_api_keys,
             bg='#4CAF50',
             fg='white',
-            font=('Arial', 12, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -558,7 +541,7 @@ TWITCH_OAUTH_TOKEN=
                 text=f"{display_name}:",
                 bg=self.colors['bg'],
                 fg=self.colors['fg'],
-                font=('Arial', 10, 'bold'),
+                font=self.ui_font_bold,
                 width=15,
                 anchor='w'
             )
@@ -568,7 +551,7 @@ TWITCH_OAUTH_TOKEN=
                 status_row,
                 text="",
                 bg=self.colors['bg'],
-                font=('Arial', 10),
+                font=self.ui_font,
                 width=30,
                 anchor='w'
             )
@@ -589,7 +572,7 @@ TWITCH_OAUTH_TOKEN=
             text=label_text,
             bg=self.colors['bg'],
             fg=self.colors['fg'] if required else self.colors['accent'],
-            font=('Arial', 10, 'bold' if required else 'normal'),
+            font=self.ui_font_bold if required else self.ui_font,
             width=20,
             anchor='w'
         ).pack(side='left', padx=5)
@@ -597,9 +580,11 @@ TWITCH_OAUTH_TOKEN=
         entry = tk.Entry(
             row_frame,
             bg=self.colors['entry_bg'],
-            font=('Arial', 10),
+            fg=self.colors['fg'],
+            font=self.ui_font,
             width=40,
-            show='•'
+            show='•',
+            insertbackground=self.colors['fg']
         )
         entry.pack(side='left', padx=5)
         entry.insert(0, self.get_api_key(key_name))
@@ -612,7 +597,7 @@ TWITCH_OAUTH_TOKEN=
             command=lambda: self.toggle_key_visibility(key_name),
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='flat',
             cursor='hand2',
             width=3
@@ -625,7 +610,7 @@ TWITCH_OAUTH_TOKEN=
             command=lambda: self.open_link(link),
             bg=self.colors['accent'],
             fg='white',
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='flat',
             cursor='hand2'
         )
@@ -636,7 +621,7 @@ TWITCH_OAUTH_TOKEN=
             text=description,
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         ).pack(side='left', padx=5)
 
     def toggle_key_visibility(self, key_name):
@@ -694,7 +679,7 @@ TWITCH_OAUTH_TOKEN=
     def create_setup_tab(self, notebook):
         """Setup tab with GPT models, personality, memory, response length"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='Setup')
+        notebook.add(tab, text='⚙️ Setup')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -707,7 +692,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(config_frame, text="Model:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 11)).grid(row=2, column=0, sticky='w', pady=5)
+                 font=self.ui_font_bold).grid(row=2, column=0, sticky='w', pady=5)
 
         models = [
             'gpt-4o',
@@ -725,10 +710,10 @@ TWITCH_OAUTH_TOKEN=
 
         info_label = tk.Label(
             config_frame,
-            text=" Crazy Epic Tip: gpt-4o supports vision & is the most capable.",
+            text="💡 Crazy Epic Tip: gpt-4o supports vision & is the most capable.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         )
         info_label.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
@@ -741,12 +726,12 @@ TWITCH_OAUTH_TOKEN=
             text="Control how long and detailed the bot's responses are:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         tk.Label(response_section, text="Response Length:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=1, column=0, sticky='w', pady=5)
 
         self.response_length_var = tk.StringVar(value=self.config.get('response_length', 'normal'))
         response_lengths = ['brief', 'normal', 'detailed', 'custom']
@@ -773,7 +758,7 @@ TWITCH_OAUTH_TOKEN=
             text=length_descriptions[self.response_length_var.get()],
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic'),
+            font=(self.ui_font[0], 9, 'italic'),
             wraplength=500,
             justify='left'
         )
@@ -787,7 +772,7 @@ TWITCH_OAUTH_TOKEN=
             text="Max Response Tokens:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).pack(side='left', padx=5)
 
         self.max_response_tokens_var = tk.IntVar(value=self.config.get('max_response_tokens', 150))
@@ -810,7 +795,7 @@ TWITCH_OAUTH_TOKEN=
             text=f"{self.max_response_tokens_var.get()} tokens",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         )
         self.tokens_value_label.pack(side='left', padx=5)
 
@@ -822,7 +807,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(response_section, text="Response Style:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=4, column=0, sticky='w', pady=5)
 
         self.response_style_var = tk.StringVar(value=self.config.get('response_style', 'conversational'))
         response_styles = ['casual', 'conversational', 'professional', 'custom']
@@ -845,7 +830,7 @@ TWITCH_OAUTH_TOKEN=
             text="Custom Style Instructions:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).pack(anchor='w', padx=5)
 
         self.custom_style_text = tk.Text(
@@ -853,8 +838,9 @@ TWITCH_OAUTH_TOKEN=
             height=3,
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
-            wrap='word'
+            font=(self.ui_font[0], 9),
+            wrap='word',
+            insertbackground=self.colors['fg']
         )
         self.custom_style_text.pack(fill='x', padx=5, pady=5)
         self.custom_style_text.insert('1.0', self.config.get('custom_response_style', ''))
@@ -867,10 +853,9 @@ TWITCH_OAUTH_TOKEN=
             text='Example: "Use humor when appropriate. Reference pop culture occasionally. Randomly start screaming in terror."',
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).pack(anchor='w', padx=5)
 
-        # Show/hide based on current selection
         self.update_custom_style_visibility()
 
         style_descriptions = {
@@ -885,7 +870,7 @@ TWITCH_OAUTH_TOKEN=
             text=style_descriptions[self.response_style_var.get()],
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         )
         self.style_desc_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=5)
 
@@ -898,7 +883,7 @@ TWITCH_OAUTH_TOKEN=
             text="Configure how much the bot remembers from the conversation:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         tk.Label(
@@ -906,12 +891,12 @@ TWITCH_OAUTH_TOKEN=
             text="Conversation history is automatically saved to: conversation_history.json",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         ).grid(row=1, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         tk.Label(memory_section, text="Max Context Tokens:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=2, column=0, sticky='w', pady=5)
 
         self.max_tokens_var = tk.StringVar(value=self.config.get('max_context_tokens', '8000'))
         max_tokens_options = ['4000', '8000', '16000', '32000', '128000']
@@ -931,12 +916,12 @@ TWITCH_OAUTH_TOKEN=
             text="Higher = more memory but more expensive. GPT-4o supports up to 128K tokens.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         ).grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
         tk.Label(memory_section, text="Auto-Reset Conversation:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=4, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=4, column=0, sticky='w', pady=5)
 
         self.auto_reset_var = tk.BooleanVar(value=self.config.get('auto_reset', False))
         auto_reset_check = tk.Checkbutton(
@@ -945,8 +930,10 @@ TWITCH_OAUTH_TOKEN=
             variable=self.auto_reset_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
-            selectcolor=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('auto_reset', self.auto_reset_var.get())
         )
         auto_reset_check.grid(row=4, column=1, sticky='w', pady=5)
@@ -957,7 +944,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.clear_conversation_history,
             bg='#FF6B6B',
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2'
         )
@@ -969,7 +956,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(personality_section, text="System Prompt / Personality:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 11, 'bold')).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
+                 font=self.ui_font_bold).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         text_frame = tk.Frame(personality_section, bg=self.colors['accent'], bd=2)
         text_frame.grid(row=1, column=0, columnspan=2, sticky='ew', pady=5)
@@ -981,7 +968,8 @@ TWITCH_OAUTH_TOKEN=
             fg=self.colors['fg'],
             font=('Consolas', 10),
             wrap='word',
-            relief='flat'
+            relief='flat',
+            insertbackground=self.colors['fg']
         )
         self.personality_text.pack(fill='both', expand=True, padx=2, pady=2)
         self.personality_text.insert('1.0', self.config['personality'])
@@ -992,7 +980,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.save_personality,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2'
         )
@@ -1007,7 +995,7 @@ TWITCH_OAUTH_TOKEN=
             text="Test your OpenAI API key and model configuration before starting the full chatbot:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10),
+            font=self.ui_font,
             wraplength=600,
             justify='left'
         )
@@ -1015,11 +1003,11 @@ TWITCH_OAUTH_TOKEN=
 
         test_btn = tk.Button(
             test_section,
-            text="Test Bot's Connection",
+            text="🧪 Test Bot's Connection",
             command=self.test_ai_connection,
             bg='#2196F3',
             fg='white',
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2',
             width=20
@@ -1031,7 +1019,7 @@ TWITCH_OAUTH_TOKEN=
             text="",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10),
+            font=self.ui_font,
             wraplength=600,
             justify='left'
         )
@@ -1092,7 +1080,6 @@ TWITCH_OAUTH_TOKEN=
                 elevenlabs_settings=elevenlabs_settings
             )
 
-            # Restore audio callbacks for avatar
             self.engine.tts.set_audio_callbacks(
                 on_start=self.engine._on_audio_start,
                 on_active=self.engine._on_audio_active,
@@ -1100,7 +1087,6 @@ TWITCH_OAUTH_TOKEN=
                 on_end=self.engine._on_audio_end
             )
 
-            # Restore volume threshold
             self.engine.tts.set_volume_threshold(self.config.get('volume_threshold', 0.02))
 
             print(f"[App] TTS reinitialized with voice: {self.config['elevenlabs_voice']}")
@@ -1122,7 +1108,7 @@ TWITCH_OAUTH_TOKEN=
     def create_tts_tab(self, notebook):
         """TTS tab with dynamic voice dropdown and voice testing"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='TTS')
+        notebook.add(tab, text='🔊 TTS')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1132,19 +1118,13 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(tts_frame, text="TTS Service:",
                 bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 11)).grid(row=0, column=0, sticky='w', pady=5)
+                font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
         tts_services = ['elevenlabs', 'streamelements', 'coqui-tts', 'azure']
         self.tts_var = tk.StringVar(value=self.config['tts_service'])
         tts_menu = ttk.Combobox(tts_frame, textvariable=self.tts_var,
                                values=tts_services, state='readonly', width=25)
         tts_menu.grid(row=0, column=1, sticky='w', pady=5)
-
-        def on_tts_change(self, event=None):
-            """Handle TTS service change"""
-            self.update_config('tts_service', self.tts_var.get())
-            self.update_voice_dropdown()
-            self.reinitialize_tts()  # Apply immediately if chatbot is running
         tts_menu.bind('<<ComboboxSelected>>', self.on_tts_change)
 
         voice_section = self.create_section(scrollable, "Voice Settings", 1)
@@ -1153,7 +1133,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(voice_section, text="Voice:",
                 bg=self.colors['bg'], fg=self.colors['fg'],
-                font=('Arial', 11)).grid(row=0, column=0, sticky='w', pady=5)
+                font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
         self.voice_var = tk.StringVar(value=self.config.get('elevenlabs_voice', 'rachel'))
         self.voice_menu = ttk.Combobox(voice_section, textvariable=self.voice_var,
@@ -1163,17 +1143,17 @@ TWITCH_OAUTH_TOKEN=
 
         def on_voice_change(e):
             self.update_config('elevenlabs_voice', self.voice_var.get())
-            self.reinitialize_tts()  # Apply immediately if chatbot is running
+            self.reinitialize_tts()
 
         self.voice_menu.bind('<<ComboboxSelected>>', on_voice_change)
 
         self.refresh_voices_btn = tk.Button(
             voice_section,
-            text="Refresh Voices",
+            text="🔄 Refresh Voices",
             command=self.refresh_elevenlabs_voices,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='flat',
             cursor='hand2'
         )
@@ -1184,19 +1164,18 @@ TWITCH_OAUTH_TOKEN=
             text="Click 'Refresh Voices' to load your custom ElevenLabs voices",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         )
         self.voice_info_label.grid(row=1, column=0, columnspan=3, sticky='w', pady=5)
 
         self.elevenlabs_settings_section = self.create_section(scrollable, "ElevenLabs Voice Settings", 2)
-
 
         tk.Label(
             self.elevenlabs_settings_section,
             text="Stability:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=0, column=0, sticky='w', pady=5)
 
         self.stability_var = tk.DoubleVar(value=self.config.get('elevenlabs_stability', 0.5))
@@ -1220,7 +1199,7 @@ TWITCH_OAUTH_TOKEN=
             text="(Lower = more variable, Higher = more stable)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).grid(row=0, column=2, sticky='w', padx=5)
 
         tk.Label(
@@ -1228,7 +1207,7 @@ TWITCH_OAUTH_TOKEN=
             text="Similarity Boost:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=1, column=0, sticky='w', pady=5)
 
         self.similarity_var = tk.DoubleVar(value=self.config.get('elevenlabs_similarity', 0.75))
@@ -1252,7 +1231,7 @@ TWITCH_OAUTH_TOKEN=
             text="(Higher = closer to original voice)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).grid(row=1, column=2, sticky='w', padx=5)
 
         tk.Label(
@@ -1260,7 +1239,7 @@ TWITCH_OAUTH_TOKEN=
             text="Style Exaggeration:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=2, column=0, sticky='w', pady=5)
 
         self.style_var = tk.DoubleVar(value=self.config.get('elevenlabs_style', 0.0))
@@ -1284,7 +1263,7 @@ TWITCH_OAUTH_TOKEN=
             text="(Higher = more expressive/dramatic)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).grid(row=2, column=2, sticky='w', padx=5)
 
         self.speaker_boost_var = tk.BooleanVar(value=self.config.get('elevenlabs_speaker_boost', True))
@@ -1294,8 +1273,10 @@ TWITCH_OAUTH_TOKEN=
             variable=self.speaker_boost_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10),
-            selectcolor=self.colors['accent'],
+            font=self.ui_font,
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('elevenlabs_speaker_boost', self.speaker_boost_var.get())
         )
         speaker_boost_check.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
@@ -1309,16 +1290,16 @@ TWITCH_OAUTH_TOKEN=
             text="Test your selected voice before using it:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         test_voice_btn = tk.Button(
             test_voice_section,
-            text="Test Voice",
+            text="🎵 Test Voice",
             command=self.test_voice,
             bg='#2196F3',
             fg='white',
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2',
             width=15
@@ -1330,16 +1311,16 @@ TWITCH_OAUTH_TOKEN=
             text="",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         )
         self.test_voice_label.grid(row=1, column=1, sticky='w', padx=10)
 
         self.update_voice_dropdown()
 
     def create_inputs_tab(self, notebook):
-        """Inputs tab with microphone, screenshot, and ENHANCED Twitch settings"""
+        """Inputs tab with microphone, screenshot, and Twitch settings"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='Inputs')
+        notebook.add(tab, text='🎤 Inputs')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1354,15 +1335,17 @@ TWITCH_OAUTH_TOKEN=
             variable=self.mic_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11, 'bold'),
-            selectcolor=self.colors['accent'],
+            font=self.ui_font_bold,
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('mic_enabled', self.mic_var.get())
         )
         mic_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
         tk.Label(mic_section, text="Microphone Device:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=1, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=1, column=0, sticky='w', pady=5)
 
         self.mic_device_var = tk.StringVar(value="Default")
         self.mic_device_menu = ttk.Combobox(mic_section, textvariable=self.mic_device_var,
@@ -1373,11 +1356,11 @@ TWITCH_OAUTH_TOKEN=
 
         refresh_btn = tk.Button(
             mic_section,
-            text="Refresh",
+            text="🔄 Refresh",
             command=self.refresh_microphone_list,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='flat',
             cursor='hand2'
         )
@@ -1385,14 +1368,14 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(mic_section, text="Recording Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=2, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=2, column=0, sticky='w', pady=5)
 
         mode_label = tk.Label(
             mic_section,
             text="Push-to-Talk (Hold your selected hotkey to speak)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'italic')
+            font=(self.ui_font[0], 10, 'italic')
         )
         mode_label.grid(row=2, column=1, sticky='w', pady=5)
 
@@ -1407,19 +1390,21 @@ TWITCH_OAUTH_TOKEN=
             variable=self.screen_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11),
-            selectcolor=self.colors['accent'],
+            font=self.ui_font_bold,
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('screen_enabled', self.screen_var.get())
         )
         screen_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
         test_screenshot_btn = tk.Button(
             screen_section,
-            text="Test Screenshot Capture",
+            text="📸 Test Screenshot Capture",
             command=self.test_screenshot,
             bg='#2196F3',
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2',
             width=25
@@ -1431,7 +1416,7 @@ TWITCH_OAUTH_TOKEN=
             text="Takes a screenshot and has the bot describe what it sees",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         )
         self.test_screenshot_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
 
@@ -1446,26 +1431,27 @@ TWITCH_OAUTH_TOKEN=
             variable=self.twitch_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11, 'bold'),
-            selectcolor=self.colors['accent'],
+            font=self.ui_font_bold,
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('twitch_enabled', self.twitch_var.get())
         )
         twitch_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
         self.twitch_entry = self.create_entry(twitch_section, "Channel Name:", 'twitch_channel', 1)
 
-        # AI Context Settings
         tk.Label(
             twitch_section,
             text="━━━ Context Settings ━━━",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'bold')
+            font=self.ui_font_bold
         ).grid(row=2, column=0, columnspan=2, sticky='w', pady=(15, 5))
 
         tk.Label(twitch_section, text="Include Username in input:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=3, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=3, column=0, sticky='w', pady=5)
 
         self.twitch_read_username_var = tk.BooleanVar(value=self.config.get('twitch_read_username', True))
         username_check = tk.Checkbutton(
@@ -1474,19 +1460,20 @@ TWITCH_OAUTH_TOKEN=
             variable=self.twitch_read_username_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
-            selectcolor=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('twitch_read_username', self.twitch_read_username_var.get())
         )
         username_check.grid(row=3, column=1, sticky='w', pady=5)
 
-        # NEW: TTS Output Settings
         tk.Label(
             twitch_section,
             text="━━━ TTS Output Settings ━━━",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'bold')
+            font=self.ui_font_bold
         ).grid(row=4, column=0, columnspan=2, sticky='w', pady=(15, 5))
 
         tk.Label(
@@ -1494,13 +1481,12 @@ TWITCH_OAUTH_TOKEN=
             text="Control what the bot actually SAYS out loud when responding:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         ).grid(row=5, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
-        # NEW: Speak Username checkbox
         tk.Label(twitch_section, text="Speak Username:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=6, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=6, column=0, sticky='w', pady=5)
 
         self.twitch_speak_username_var = tk.BooleanVar(value=self.config.get('twitch_speak_username', True))
         speak_username_check = tk.Checkbutton(
@@ -1509,16 +1495,17 @@ TWITCH_OAUTH_TOKEN=
             variable=self.twitch_speak_username_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
-            selectcolor=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('twitch_speak_username', self.twitch_speak_username_var.get())
         )
         speak_username_check.grid(row=6, column=1, sticky='w', pady=5)
 
-        # NEW: Speak Message checkbox
         tk.Label(twitch_section, text="Speak Message:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=7, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=7, column=0, sticky='w', pady=5)
 
         self.twitch_speak_message_var = tk.BooleanVar(value=self.config.get('twitch_speak_message', True))
         speak_message_check = tk.Checkbutton(
@@ -1527,35 +1514,35 @@ TWITCH_OAUTH_TOKEN=
             variable=self.twitch_speak_message_var,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
-            selectcolor=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
             command=lambda: self.update_config('twitch_speak_message', self.twitch_speak_message_var.get())
         )
         speak_message_check.grid(row=7, column=1, sticky='w', pady=5)
 
-        # Example output
         tk.Label(
             twitch_section,
             text='Example: When both checked, TTS will say "Username said: their message. [Bot\'s response]"',
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic'),
+            font=(self.ui_font[0], 8, 'italic'),
             wraplength=500,
             justify='left'
         ).grid(row=8, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
-        # Response Mode Settings
         tk.Label(
             twitch_section,
             text="━━━ Response Mode ━━━",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'bold')
+            font=self.ui_font_bold
         ).grid(row=9, column=0, columnspan=2, sticky='w', pady=(15, 5))
 
         tk.Label(twitch_section, text="Response Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=10, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=10, column=0, sticky='w', pady=5)
 
         self.twitch_response_mode_var = tk.StringVar(value=self.config.get('twitch_response_mode', 'all'))
         response_modes = ['all', 'keywords', 'random', 'disabled']
@@ -1582,7 +1569,7 @@ TWITCH_OAUTH_TOKEN=
             text=mode_descriptions[self.twitch_response_mode_var.get()],
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic'),
+            font=(self.ui_font[0], 9, 'italic'),
             wraplength=400,
             justify='left'
         )
@@ -1596,14 +1583,16 @@ TWITCH_OAUTH_TOKEN=
             text="Keywords (comma-separated):",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).pack(side='left', padx=5)
 
         self.twitch_keywords_entry = tk.Entry(
             self.twitch_keywords_frame,
             bg=self.colors['entry_bg'],
-            font=('Arial', 10),
-            width=30
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=30,
+            insertbackground=self.colors['fg']
         )
         self.twitch_keywords_entry.pack(side='left', padx=5)
         self.twitch_keywords_entry.insert(0, self.config.get('twitch_keywords', '!ai,!bot,!ask'))
@@ -1619,7 +1608,7 @@ TWITCH_OAUTH_TOKEN=
             text="Response Chance:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10)
+            font=self.ui_font
         ).pack(side='left', padx=5)
 
         self.twitch_chance_var = tk.IntVar(value=self.config.get('twitch_response_chance', 100))
@@ -1642,7 +1631,7 @@ TWITCH_OAUTH_TOKEN=
             text=f"{self.twitch_chance_var.get()}%",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         )
         self.chance_label.pack(side='left', padx=5)
 
@@ -1650,7 +1639,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(twitch_section, text="Response Cooldown:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=('Arial', 10)).grid(row=14, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=14, column=0, sticky='w', pady=5)
 
         cooldown_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
         cooldown_frame.grid(row=14, column=1, sticky='w', pady=5)
@@ -1675,7 +1664,7 @@ TWITCH_OAUTH_TOKEN=
             text=f"{self.twitch_cooldown_var.get()}s",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         )
         self.cooldown_label.pack(side='left', padx=5)
 
@@ -1686,7 +1675,7 @@ TWITCH_OAUTH_TOKEN=
             text="Cooldown prevents spam - set to 0 to respond immediately to every message, which is probably a bad idea",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic'),
+            font=(self.ui_font[0], 9, 'italic'),
             wraplength=500,
             justify='left'
         ).grid(row=15, column=0, columnspan=2, sticky='w', pady=5)
@@ -1735,11 +1724,10 @@ TWITCH_OAUTH_TOKEN=
     def create_avatar_tab(self, notebook):
         """Avatar tab with audio-reactive controls"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='Avatar')
+        notebook.add(tab, text='🎭 Avatar')
 
         scrollable = self.create_scrollable_frame(tab)
 
-        # Info section
         info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
         info_frame.pack(fill='x', padx=40, pady=25)
 
@@ -1770,11 +1758,10 @@ TWITCH_OAUTH_TOKEN=
             text=info_text,
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10),
+            font=self.ui_font,
             justify='left'
         ).pack(padx=30, pady=20)
 
-        # AUDIO SENSITIVITY CONTROLS
         sensitivity_section = self.create_section(scrollable, "🎚️ Audio Sensitivity Controls", 0)
         sensitivity_section.grid_columnconfigure(0, weight=1)
 
@@ -1783,10 +1770,9 @@ TWITCH_OAUTH_TOKEN=
             text="Adjust how sensitive the avatar is to audio volume",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'italic')
+            font=(self.ui_font[0], 10, 'italic')
         ).pack(pady=(0, 15))
 
-        # Sensitivity slider
         slider_frame = tk.Frame(sensitivity_section, bg=self.colors['bg'])
         slider_frame.pack(fill='x', padx=20, pady=10)
 
@@ -1795,7 +1781,7 @@ TWITCH_OAUTH_TOKEN=
             text="Volume Threshold:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11, 'bold')
+            font=self.ui_font_bold
         ).pack(side='left', padx=10)
 
         self.volume_threshold_var = tk.DoubleVar(value=self.config.get('volume_threshold', 0.02))
@@ -1820,12 +1806,11 @@ TWITCH_OAUTH_TOKEN=
             text=f"{self.volume_threshold_var.get():.3f}",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             width=8
         )
         self.threshold_label.pack(side='left', padx=5)
 
-        # Sensitivity guide
         guide_frame = tk.Frame(sensitivity_section, bg=self.colors['bg'])
         guide_frame.pack(fill='x', padx=40, pady=10)
 
@@ -1834,7 +1819,7 @@ TWITCH_OAUTH_TOKEN=
             text="← MORE SENSITIVE (opens easily)",
             bg=self.colors['bg'],
             fg='#4CAF50',
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         ).pack(side='left')
 
         tk.Label(
@@ -1842,10 +1827,9 @@ TWITCH_OAUTH_TOKEN=
             text="LESS SENSITIVE (requires louder audio) →",
             bg=self.colors['bg'],
             fg='#FF6B6B',
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         ).pack(side='right')
 
-        # AUDIO METER
         meter_section = self.create_section(scrollable, "🎵 Real-Time Audio Meter", 1)
         meter_section.grid_columnconfigure(0, weight=1)
 
@@ -1854,10 +1838,9 @@ TWITCH_OAUTH_TOKEN=
             text="Watch the meter during speech to see when avatar will open/close",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic')
+            font=(self.ui_font[0], 9, 'italic')
         ).pack(pady=(0, 10))
 
-        # Audio meter canvas
         meter_frame = tk.Frame(meter_section, bg=self.colors['accent'], bd=3, relief='solid')
         meter_frame.pack(padx=40, pady=10)
 
@@ -1865,17 +1848,15 @@ TWITCH_OAUTH_TOKEN=
             meter_frame,
             width=500,
             height=80,
-            bg='#1a1a1a',
+            bg='#0D0505',
             highlightthickness=0
         )
         self.audio_meter.pack(padx=3, pady=3)
 
-        # Initialize meter components
         self.meter_threshold_line = None
         self.meter_volume_bar = None
         self.update_meter_threshold_line()
 
-        # Meter labels
         meter_label_frame = tk.Frame(meter_section, bg=self.colors['bg'])
         meter_label_frame.pack()
 
@@ -1884,7 +1865,7 @@ TWITCH_OAUTH_TOKEN=
             text="IDLE (no audio)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 12, 'bold')
+            font=self.ui_font_bold
         )
         self.meter_status_label.pack(pady=5)
 
@@ -1893,11 +1874,10 @@ TWITCH_OAUTH_TOKEN=
             text="Volume: 0.000",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9)
+            font=(self.ui_font[0], 9)
         )
         self.meter_value_label.pack()
 
-        # Test button
         test_frame = tk.Frame(meter_section, bg=self.colors['bg'])
         test_frame.pack(pady=15)
 
@@ -1907,7 +1887,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.test_audio_sensitivity,
             bg='#2196F3',
             fg='white',
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -1920,10 +1900,9 @@ TWITCH_OAUTH_TOKEN=
             text="Plays test audio - watch meter and avatar to fine-tune sensitivity",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).pack(pady=5)
 
-        # Window controls section
         controls_section = self.create_section(scrollable, "Avatar Window Controls", 2)
         controls_section.grid_columnconfigure(0, weight=1)
 
@@ -1936,7 +1915,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.toggle_avatar_window,
             bg='#2196F3',
             fg='white',
-            font=('Arial', 12, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -1950,7 +1929,7 @@ TWITCH_OAUTH_TOKEN=
             text="⚫ Window Hidden",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 10, 'italic')
+            font=(self.ui_font[0], 10, 'italic')
         )
         self.avatar_status_label.pack(pady=5)
 
@@ -1959,11 +1938,10 @@ TWITCH_OAUTH_TOKEN=
             text="Tip: Keep the window open but hidden behind other windows so that OBS can keep the capture active",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 9, 'italic'),
+            font=(self.ui_font[0], 9, 'italic'),
             justify='center'
         ).pack(pady=10)
 
-        # Image selection section
         images_section = self.create_section(scrollable, "Select Avatar Images", 3)
         images_section.grid_columnconfigure(0, weight=1)
 
@@ -1975,7 +1953,7 @@ TWITCH_OAUTH_TOKEN=
             text="Speaking Image:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             width=18,
             anchor='w'
         ).pack(side='left', padx=5)
@@ -1985,7 +1963,7 @@ TWITCH_OAUTH_TOKEN=
             text=self.config.get('speaking_image', 'Not selected') or 'Not selected',
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='sunken',
             anchor='w',
             padx=10,
@@ -1999,7 +1977,7 @@ TWITCH_OAUTH_TOKEN=
             command=lambda: self.browse_image('speaking'),
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=2,
             cursor='hand2',
@@ -2015,7 +1993,7 @@ TWITCH_OAUTH_TOKEN=
             text="Idle Image:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             width=18,
             anchor='w'
         ).pack(side='left', padx=5)
@@ -2025,7 +2003,7 @@ TWITCH_OAUTH_TOKEN=
             text=self.config.get('idle_image', 'Not selected') or 'Not selected',
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=('Arial', 9),
+            font=(self.ui_font[0], 9),
             relief='sunken',
             anchor='w',
             padx=10,
@@ -2039,7 +2017,7 @@ TWITCH_OAUTH_TOKEN=
             command=lambda: self.browse_image('idle'),
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=2,
             cursor='hand2',
@@ -2047,17 +2025,16 @@ TWITCH_OAUTH_TOKEN=
             pady=5
         ).pack(side='left', padx=5)
 
-        # Reload button
         reload_frame = tk.Frame(images_section, bg=self.colors['bg'])
         reload_frame.pack(pady=15)
 
         tk.Button(
             reload_frame,
-            text="Reload Avatar Window",
+            text="🔄 Reload Avatar Window",
             command=self.reload_avatar_images,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='flat',
             cursor='hand2',
             padx=20,
@@ -2069,10 +2046,9 @@ TWITCH_OAUTH_TOKEN=
             text="Click after changing images to update the avatar window",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
-            font=('Arial', 8, 'italic')
+            font=(self.ui_font[0], 8, 'italic')
         ).pack(pady=5)
 
-        # Preview section
         preview_section = self.create_section(scrollable, "Preview", 4)
         preview_section.grid_columnconfigure(0, weight=1)
 
@@ -2087,7 +2063,7 @@ TWITCH_OAUTH_TOKEN=
             text="No image selected\n\nSelect an image above to see preview",
             bg=self.colors['text_bg'],
             fg=self.colors['accent'],
-            font=('Arial', 11, 'italic'),
+            font=self.ui_font_large,
             width=50,
             height=18,
             relief='flat'
@@ -2095,8 +2071,6 @@ TWITCH_OAUTH_TOKEN=
         self.preview_label.pack(padx=3, pady=3)
 
         self.load_existing_avatar_previews()
-
-        # Start audio meter update loop
         self.start_audio_meter_updates()
 
     def on_threshold_change(self, value):
@@ -2105,11 +2079,9 @@ TWITCH_OAUTH_TOKEN=
         self.threshold_label.config(text=f"{threshold:.3f}")
         self.update_config('volume_threshold', threshold)
 
-        # Update engine if running
         if self.engine and self.engine.is_running:
             self.engine.set_volume_threshold(threshold)
 
-        # Update threshold line on meter
         self.update_meter_threshold_line()
 
     def update_meter_threshold_line(self):
@@ -2117,15 +2089,12 @@ TWITCH_OAUTH_TOKEN=
         if not hasattr(self, 'audio_meter'):
             return
 
-        # Remove old line
         if self.meter_threshold_line:
             self.audio_meter.delete(self.meter_threshold_line)
 
-        # Calculate position (threshold is 0.0-0.15, meter is 500px wide)
         threshold = self.volume_threshold_var.get()
         x_pos = int((threshold / 0.75) * 500)
 
-        # Draw new threshold line
         self.meter_threshold_line = self.audio_meter.create_line(
             x_pos, 0, x_pos, 80,
             fill='#FFD700',
@@ -2133,31 +2102,25 @@ TWITCH_OAUTH_TOKEN=
             dash=(5, 5)
         )
 
-        # Add label
         self.audio_meter.create_text(
             x_pos, 10,
             text="THRESHOLD",
             fill='#FFD700',
-            font=('Arial', 8, 'bold'),
+            font=(self.ui_font[0], 8, 'bold'),
             anchor='s'
         )
 
     def start_audio_meter_updates(self):
         """Start updating the audio meter in real-time"""
-
         def update_meter():
             if self.engine and self.engine.tts and self.engine.is_speaking:
-                # Get current volume from TTS manager
                 volume = self.engine.tts.get_current_volume()
                 self.update_audio_meter(volume)
             else:
-                # No audio playing
                 self.update_audio_meter(0.0)
 
-            # Schedule next update (60 FPS)
             self.root.after(16, update_meter)
 
-        # Start the update loop
         self.root.after(100, update_meter)
 
     def update_audio_meter(self, volume):
@@ -2165,28 +2128,22 @@ TWITCH_OAUTH_TOKEN=
         if not hasattr(self, 'audio_meter'):
             return
 
-        # Remove old volume bar
         if self.meter_volume_bar:
             self.audio_meter.delete(self.meter_volume_bar)
 
-        # Calculate bar width (volume is 0.0-1.0, but we normalize to threshold range)
-        normalized_volume = min(volume, 0.75)  # Cap at max threshold
+        normalized_volume = min(volume, 0.75)
         bar_width = int((normalized_volume / 0.75) * 500)
 
-        # Determine color based on threshold
         threshold = self.volume_threshold_var.get()
         if volume > threshold:
-            # Above threshold - green (speaking)
             color = '#4CAF50'
             status = "SPEAKING"
             status_color = '#4CAF50'
         else:
-            # Below threshold - red (idle)
             color = '#FF6B6B'
             status = "IDLE"
             status_color = '#FF6B6B'
 
-        # Draw volume bar
         if bar_width > 0:
             self.meter_volume_bar = self.audio_meter.create_rectangle(
                 0, 0, bar_width, 80,
@@ -2194,11 +2151,9 @@ TWITCH_OAUTH_TOKEN=
                 outline=''
             )
 
-        # Update labels
         self.meter_status_label.config(text=status, fg=status_color)
         self.meter_value_label.config(text=f"Volume: {volume:.3f}")
 
-        # Ensure threshold line stays on top
         if self.meter_threshold_line:
             self.audio_meter.tag_raise(self.meter_threshold_line)
 
@@ -2218,10 +2173,8 @@ TWITCH_OAUTH_TOKEN=
             "Try adjusting the sensitivity slider if needed."
         )
 
-        # Display message
         self.add_chat_message("System", "Testing audio sensitivity - watch the meter and avatar!")
 
-        # Speak test text
         def test_thread():
             self.engine._speak_response(test_text)
 
@@ -2230,7 +2183,6 @@ TWITCH_OAUTH_TOKEN=
     def toggle_avatar_window(self):
         """Toggle the avatar window visibility"""
         if not self.engine.avatar_window:
-            # Create window if it doesn't exist
             idle = self.config.get('idle_image', '')
             speaking = self.config.get('speaking_image', '')
 
@@ -2248,14 +2200,12 @@ TWITCH_OAUTH_TOKEN=
                 )
                 return
 
-            # Initialize avatar window
             self.engine._load_images()
             if self.engine.avatar_window:
                 self.engine.avatar_window.show()
                 self.avatar_window_btn.config(text="Hide Avatar Window")
                 self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
         else:
-            # Toggle existing window
             is_visible = self.engine.toggle_avatar_window()
             if is_visible:
                 self.avatar_window_btn.config(text="Hide Avatar Window")
@@ -2283,12 +2233,11 @@ TWITCH_OAUTH_TOKEN=
             )
             return
 
-        # Reload images
         self.engine._load_images()
         messagebox.showinfo("Success", "Avatar images reloaded successfully!")
 
     def create_control_panel(self, parent):
-        """Create bottom control panel - always visible"""
+        """Create bottom control panel"""
         panel = tk.Frame(parent, bg=self.colors['accent'])
         panel.pack(fill='x', side='bottom')
 
@@ -2303,7 +2252,7 @@ TWITCH_OAUTH_TOKEN=
             text="⚫ Stopped",
             bg=self.colors['accent'],
             fg='white',
-            font=('Arial', 12, 'bold')
+            font=self.ui_font_bold
         )
         self.status_label.pack(anchor='w')
 
@@ -2312,7 +2261,7 @@ TWITCH_OAUTH_TOKEN=
             text="",
             bg=self.colors['accent'],
             fg='#FFD700',
-            font=('Arial', 10)
+            font=self.ui_font
         )
         self.recording_label.pack(anchor='w')
 
@@ -2321,11 +2270,11 @@ TWITCH_OAUTH_TOKEN=
 
         self.screenshot_btn = tk.Button(
             center_frame,
-            text="Screenshot & Respond",
+            text="📸 Screenshot & Respond",
             command=self.screenshot_and_respond,
             bg='#FF6B6B',
             fg='white',
-            font=('Arial', 10, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -2346,7 +2295,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.save_all_settings,
             bg=self.colors['button'],
             fg='white',
-            font=('Arial', 11, 'bold'),
+            font=self.ui_font_bold,
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -2361,7 +2310,7 @@ TWITCH_OAUTH_TOKEN=
             command=self.toggle_chatbot,
             bg='#4CAF50',
             fg='white',
-            font=('Arial', 13, 'bold'),
+            font=(self.ui_font[0], 13, 'bold'),
             relief='raised',
             borderwidth=3,
             cursor='hand2',
@@ -2371,12 +2320,12 @@ TWITCH_OAUTH_TOKEN=
         self.start_btn.pack(side='left', padx=5)
 
     def create_section(self, parent, title, row):
-        """Create labeled section with centered content"""
+        """Create labeled section"""
         outer = tk.Frame(parent, bg=self.colors['bg'])
         outer.pack(fill='x', padx=30, pady=15)
 
         section = tk.Frame(outer, bg=self.colors['bg'])
-        section.pack(anchor='center')  # Center the section
+        section.pack(anchor='center')
 
         title_frame = tk.Frame(section, bg=self.colors['bg'])
         title_frame.pack(fill='x', pady=(0, 10))
@@ -2386,34 +2335,36 @@ TWITCH_OAUTH_TOKEN=
             text=title,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=self.ui_font_bold  # Use custom font
+            font=self.ui_font_bold
         ).pack(anchor='center')
 
         separator = tk.Frame(title_frame, bg=self.colors['accent'], height=2)
         separator.pack(fill='x', pady=(5, 0))
 
         frame = tk.Frame(section, bg=self.colors['bg'])
-        frame.pack(fill='both', padx=10)  # Changed from fill='x' to fill='both'
+        frame.pack(fill='both', padx=10)
 
         return frame
 
     def create_entry(self, parent, label, config_key, row):
-        """Create labeled entry - centered with proper alignment"""
+        """Create labeled entry"""
         tk.Label(
             parent,
             text=label,
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             font=self.ui_font
-        ).grid(row=row, column=0, sticky='e', pady=5, padx=(0, 10))  # Right-align labels
+        ).grid(row=row, column=0, sticky='e', pady=5, padx=(0, 10))
 
         entry = tk.Entry(
             parent,
             bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
             font=self.ui_font,
-            width=30
+            width=30,
+            insertbackground=self.colors['fg']
         )
-        entry.grid(row=row, column=1, sticky='w', pady=5, padx=(10, 0))  # Left-align entries
+        entry.grid(row=row, column=1, sticky='w', pady=5, padx=(10, 0))
         entry.insert(0, self.config[config_key])
         entry.bind('<FocusOut>',
                    lambda e, key=config_key: self.update_config(key, entry.get()))
@@ -2422,18 +2373,15 @@ TWITCH_OAUTH_TOKEN=
 
     def auto_load_elevenlabs_voices(self):
         """Auto-load ElevenLabs voices if API key is configured"""
-        # Only if ElevenLabs is selected
         if self.config.get('tts_service') == 'elevenlabs':
             api_key = os.getenv('ELEVENLABS_API_KEY')
 
-            # Check if valid API key exists
             if api_key and api_key != 'your-elevenlabs-key-here' and len(api_key) > 10:
                 print("[App] Auto-loading ElevenLabs voices...")
 
-                # Load in background thread
                 def load_voices_thread():
                     try:
-                        time.sleep(0.5)  # Let UI load first
+                        time.sleep(0.5)
                         self.refresh_elevenlabs_voices()
                     except Exception as e:
                         print(f"[App] Auto-load failed: {e}")
@@ -2649,14 +2597,12 @@ TWITCH_OAUTH_TOKEN=
         threading.Thread(target=test_thread, daemon=True).start()
 
     def update_voice_dropdown(self):
-        """Update voice dropdown based on selected TTS service - CRASH FIXED"""
+        """Update voice dropdown based on selected TTS service"""
         service = self.tts_var.get()
         voices = self.voice_options.get(service, ['default'])
 
         if service == 'elevenlabs':
-            # ElevenLabs - check if voices loaded
             if not voices or len(voices) == 0:
-                # FIXED: Don't try to access voices[0] on empty list
                 self.voice_menu['values'] = ['⚠️ Click "Refresh Voices" to load']
                 self.voice_var.set('⚠️ Click "Refresh Voices" to load')
                 self.voice_info_label.config(
@@ -2664,7 +2610,6 @@ TWITCH_OAUTH_TOKEN=
                     fg=self.colors['accent']
                 )
             else:
-                # Voices loaded - safe to access
                 self.voice_menu['values'] = voices
                 current_voice = self.voice_var.get()
                 if current_voice not in voices:
@@ -2675,20 +2620,17 @@ TWITCH_OAUTH_TOKEN=
                     fg='#4CAF50'
                 )
 
-            # Show ElevenLabs controls
             self.refresh_voices_btn.grid()
             self.voice_info_label.grid()
             for widget in self.elevenlabs_settings_section.winfo_children():
                 widget.grid()
         else:
-            # Other TTS services
             self.voice_menu['values'] = voices
             current_voice = self.voice_var.get()
             if current_voice not in voices and len(voices) > 0:
                 self.voice_var.set(voices[0])
                 self.update_config('elevenlabs_voice', voices[0])
 
-            # Hide ElevenLabs controls
             self.refresh_voices_btn.grid_remove()
             self.voice_info_label.grid_remove()
             for widget in self.elevenlabs_settings_section.winfo_children():
@@ -2725,7 +2667,8 @@ TWITCH_OAUTH_TOKEN=
                 self.voice_menu['values'] = all_voices
 
                 self.voice_info_label.config(
-                    text=f"Loaded {len(custom_voices)} custom voice(s) from your account"
+                    text=f"✅ Loaded {len(custom_voices)} custom voice(s) from your account",
+                    fg='#4CAF50'
                 )
             else:
                 self.voice_info_label.config(text="No custom voices found in your account")
@@ -2741,6 +2684,7 @@ TWITCH_OAUTH_TOKEN=
         """Handle TTS service change"""
         self.update_config('tts_service', self.tts_var.get())
         self.update_voice_dropdown()
+        self.reinitialize_tts()
 
     def browse_image(self, image_type):
         """Browse for avatar image"""
@@ -2766,10 +2710,8 @@ TWITCH_OAUTH_TOKEN=
             else:
                 self.idle_path_label.config(text=display_path, fg=self.colors['fg'])
 
-            # Show preview
             self.update_avatar_preview(filename)
 
-            # Auto-reload avatar window if it exists
             if self.engine.avatar_window:
                 self.engine._load_images()
                 print(f"[App] Auto-reloaded {image_type} image in avatar window")
@@ -2778,27 +2720,20 @@ TWITCH_OAUTH_TOKEN=
         """Update the avatar preview with the selected image"""
         try:
             img = Image.open(filename)
-
-            # Resize to fit preview (max 400x400)
             img.thumbnail((400, 400), Image.Resampling.LANCZOS)
 
-            # Create a neon green background if image has transparency
             if img.mode in ('RGBA', 'LA') or (img.mode == 'P' and 'transparency' in img.info):
-                # Create neon green background
-                background = Image.new('RGB', img.size, '#00FF00')  # Neon green
+                background = Image.new('RGB', img.size, '#00FF00')
 
-                # Convert image to RGBA if needed
                 if img.mode != 'RGBA':
                     img = img.convert('RGBA')
 
-                # Composite image over green background
                 background.paste(img, (0, 0), img)
                 img = background
 
-            # Convert to PhotoImage and display
             photo = ImageTk.PhotoImage(img)
             self.preview_label.config(image=photo, text="")
-            self.preview_label.image = photo  # Keep reference
+            self.preview_label.image = photo
 
         except Exception as e:
             print(f"[App] Error loading preview: {e}")
@@ -2809,11 +2744,9 @@ TWITCH_OAUTH_TOKEN=
 
     def load_existing_avatar_previews(self):
         """Load preview of already configured images"""
-        # Check if speaking image exists and show preview
         speaking_path = self.config.get('speaking_image', '')
         if speaking_path and Path(speaking_path).exists():
             self.update_avatar_preview(speaking_path)
-        # If only idle image exists, show that instead
         elif self.config.get('idle_image', '') and Path(self.config.get('idle_image', '')).exists():
             self.update_avatar_preview(self.config.get('idle_image', ''))
 
@@ -2962,7 +2895,7 @@ TWITCH_OAUTH_TOKEN=
 
         threading.Thread(target=screenshot_thread, daemon=True).start()
 
-    def remove_hotkeys(self):  # UNINDENT - should be at class level
+    def remove_hotkeys(self):
         """Remove all hotkeys"""
         if self.hotkey_active:
             try:
@@ -2972,7 +2905,7 @@ TWITCH_OAUTH_TOKEN=
                 pass
 
     def send_text_message(self):
-        """Send text message - works in test mode or full chatbot mode"""
+        """Send text message"""
         text = self.text_input.get().strip()
         if not text:
             return
@@ -2981,13 +2914,11 @@ TWITCH_OAUTH_TOKEN=
         self.add_chat_message(self.config['user_name'], text)
 
         if self.engine.is_running:
-            # Full chatbot mode - process normally
             def process_thread():
                 self.engine.process_text_input(text)
 
             threading.Thread(target=process_thread, daemon=True).start()
         else:
-            # Test mode - get response with TTS
             self.add_chat_message("System", "Test mode: Getting response with voice...")
 
             def test_thread():
@@ -2995,7 +2926,6 @@ TWITCH_OAUTH_TOKEN=
                     from llm_manager import LLMManager
                     from tts_manager import TTSManager
 
-                    # Create temporary LLM instance
                     system_prompt = self.config['personality']
                     if self.config['ai_name'] != 'Assistant':
                         system_prompt += f"\n\nYour name is {self.config['ai_name']}."
@@ -3005,7 +2935,6 @@ TWITCH_OAUTH_TOKEN=
                         system_prompt=system_prompt
                     )
 
-                    # Get response length setting
                     response_length = self.config.get('response_length', 'normal')
                     if response_length == 'brief':
                         max_tokens = 60
@@ -3018,11 +2947,9 @@ TWITCH_OAUTH_TOKEN=
                     else:
                         max_tokens = 150
 
-                    # Get AI response
                     response = llm.chat(text, max_response_tokens=max_tokens)
                     self.display_response(response)
 
-                    # Speak response with TTS
                     elevenlabs_settings = {
                         'stability': self.config.get('elevenlabs_stability', 0.5),
                         'similarity_boost': self.config.get('elevenlabs_similarity', 0.75),
@@ -3036,7 +2963,6 @@ TWITCH_OAUTH_TOKEN=
                         elevenlabs_settings=elevenlabs_settings
                     )
 
-                    # Speak the response
                     self.add_chat_message("System", "Speaking response...")
                     tts.speak(response)
                     self.add_chat_message("System", "Test complete!")
@@ -3078,10 +3004,6 @@ TWITCH_OAUTH_TOKEN=
         • Click the "Start Chatbot" button at the bottom
         • Or test responses right here in chat
         • It's like talking to the real voices in your head
-
-    ═══════════════════════════════════════════════════════════════════════════════
-
-    Ready to begin? Start by adding your OpenAI API key in the API Keys tab!
     
     Fuck OpenAI and Elon btw, I'll have open source models soon.
 
@@ -3090,7 +3012,7 @@ TWITCH_OAUTH_TOKEN=
         self.chat_display.insert('1.0', welcome_text, 'welcome')
         self.chat_display.config(state='disabled')
 
-    def test_ai_connection(self):  # UNINDENT - should be at class level, NOT inside show_welcome_message
+    def test_ai_connection(self):
         """Test OpenAI API connection from Setup tab"""
         self.test_status_label.config(text="Testing connection...", fg=self.colors['fg'])
         self.root.update()
@@ -3142,28 +3064,27 @@ TWITCH_OAUTH_TOKEN=
 
         threading.Thread(target=test_thread, daemon=True).start()
 
-    def display_response(self, response):  # UNINDENT - should be at class level
+    def display_response(self, response):
         """Display AI response in chat"""
         self.add_chat_message(self.config['ai_name'], response)
 
-    def add_chat_message(self, sender, message):  # UNINDENT - should be at class level
+    def add_chat_message(self, sender, message):
         """Add message to chat display"""
         self.chat_display.config(state='normal')
         self.chat_display.insert(tk.END, f"\n{sender}: {message}\n")
         self.chat_display.see(tk.END)
         self.chat_display.config(state='disabled')
 
-    def on_ai_speaking_start(self):  # UNINDENT - should be at class level
+    def on_ai_speaking_start(self):
         """Called when AI starts speaking"""
         self.status_label.config(text="🟢 Speaking...")
 
-    def on_ai_speaking_end(self):  # UNINDENT - should be at class level
+    def on_ai_speaking_end(self):
         """Called when AI finishes speaking"""
         self.status_label.config(text="🟢 Running")
 
 
 def main():
-    # Set AppUserModelID before ANY window creation
     if sys.platform == 'win32':
         try:
             import ctypes
