@@ -3005,7 +3005,7 @@ TWITCH_OAUTH_TOKEN=
         • Or test responses right here in chat
         • It's like talking to the real voices in your head
     
-    Fuck OpenAI and Elon btw, I'll have open source models soon.
+    Fuck AI btw, I'll have open source models soon.
 
     """
         self.chat_display.config(state='normal')
