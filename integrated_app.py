@@ -69,9 +69,41 @@ class IntegratedChatbotApp:
 
         self.voice_options = {
             'elevenlabs': [],
+            'streamelements': [
+                # US English Voices
+                'Brian',  # Male US
+                'Ivy',  # Female US
+                'Joanna',  # Female US
+                'Joey',  # Male US
+                'Justin',  # Male US
+                'Kendra',  # Female US
+                'Kimberly',  # Female US
+                'Matthew',  # Male US
+                'Salli',  # Female US
+
+                # British/Welsh English Voices
+                'Amy',  # Female British
+                'Emma',  # Female British
+                'Geraint',  # Male Welsh
+                'Ron',  # Male British
+
+                # Australian English Voices
+                'Nicole',  # Female Australian
+                'Russell',  # Male Australian
+
+                # Indian English Voices
+                'Raveena'  # Female Indian
+            ],
+            'azure': ['en-US-JennyNeural', 'en-US-GuyNeural', 'en-US-AriaNeural',
+                      'en-US-DavisNeural', 'en-US-AmberNeural', 'en-US-AshleyNeural',
+                      'en-US-BrandonNeural', 'en-US-ChristopherNeural'],
+            'coqui-tts': ['default']
+        }
+        self.voice_options = {
+            'elevenlabs': [],
             'streamelements': ['Brian', 'Ivy', 'Justin', 'Russell', 'Nicole', 'Emma',
                               'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
-                              'Matthew', 'Geraint', 'Raveena'],
+                              'Matthew', 'Geraint', 'Raveena', 'Ron',],
             'azure': ['en-US-JennyNeural', 'en-US-GuyNeural', 'en-US-AriaNeural',
                      'en-US-DavisNeural', 'en-US-AmberNeural', 'en-US-AshleyNeural',
                      'en-US-BrandonNeural', 'en-US-ChristopherNeural'],

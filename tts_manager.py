@@ -375,22 +375,37 @@ class TTSManager:
         """Generate speech using StreamElements"""
         try:
             voice_name = self.voice if self.voice != 'default' else 'Brian'
-            url = f"https://api.streamelements.com/kappa/v2/speech"
+            url = "https://api.streamelements.com/kappa/v2/speech"
             params = {'voice': voice_name, 'text': text}
 
-            response = requests.get(url, params=params, stream=True)
-            response.raise_for_status()
+            response = requests.get(url, params=params, timeout=15)
+
+            if response.status_code != 200:
+                print(f"[TTS] StreamElements error: Status {response.status_code} for voice '{voice_name}'")
+                return None
 
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'streamelements_{timestamp}.mp3'
 
             with open(audio_file, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=1024):
-                    f.write(chunk)
+                    if chunk:
+                        f.write(chunk)
 
-            return audio_file
+            # Verify file exists and has content
+            if audio_file.exists() and audio_file.stat().st_size > 1000:
+                return audio_file
+            else:
+                print(
+                    f"[TTS] StreamElements: Voice '{voice_name}' created invalid file ({audio_file.stat().st_size if audio_file.exists() else 0} bytes)")
+                if audio_file.exists():
+                    audio_file.unlink()
+                return None
 
-        except Exception:
+        except Exception as e:
+            print(f"[TTS] StreamElements error with '{voice_name}': {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _coqui_tts(self, text):
