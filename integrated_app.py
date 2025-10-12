@@ -68,57 +68,9 @@ class IntegratedChatbotApp:
             'streamelements': [
                 'Brian', 'Ivy', 'Justin', 'Russell', 'Nicole', 'Emma',
                 'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
-                'Matthew', 'Geraint', 'Raveena', 'Ron'
-            ],
-            'gtts': [
-                # Format: "language-accent" - gTTS only has ONE voice per language
-                # These control ACCENT (via TLD), not different voices
-                'en-us',  # English (US accent)
-                'en-uk',  # English (UK accent)
-                'en-au',  # English (Australian accent)
-                'en-ca',  # English (Canadian accent)
-                'en-in',  # English (Indian accent)
-                'es',  # Spanish
-                'fr',  # French
-                'de',  # German
-                'it',  # Italian
-                'pt',  # Portuguese
-                'ja',  # Japanese
-                'ko',  # Korean
-                'zh-cn',  # Chinese (Simplified)
-            ],
-            'piper': [
-                # === US English ===
-                'en_US-lessac-medium',
-                'en_US-lessac-high',
-                'en_US-amy-medium',
-                'en_US-ryan-high',
-                'en_US-kristin-medium',
-                'en_US-joe-medium',
-                'en_US-ryan-medium',
-                'en_US-amy-low',
-                'en_US-kathleen-low',
-                'en_US-danny-low',
-                'en_US-kusal-medium',
-                'en_US-libritts_r-medium',
-
-                # === British English ===
-                'en_GB-cori-high',
-                'en_GB-cori-medium',
-                'en_GB-alan-medium',
-                'en_GB-alba-medium',
-                'en_GB-jenny_dioco-medium',
-                'en_GB-northern_english_male-medium',
-                'en_GB-southern_english_male-medium',
-                'en_GB-semaine-medium',
-                'en_GB-alan-low',
-
-                # === Other Accents ===
-                'en_AU-nat-medium',
-                'en_IN-tejas-medium',
+                'Matthew', 'Geraint', 'Raveena',
             ],
         }
-
         self.create_gui()
 
         self.engine.on_response_callback = self.display_response
@@ -1160,7 +1112,7 @@ TWITCH_OAUTH_TOKEN=
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
-        tts_services = ['streamelements', 'gtts', 'piper', 'elevenlabs', 'azure']
+        tts_services = ['streamelements', 'elevenlabs']
         self.tts_var = tk.StringVar(value=self.config['tts_service'])
         tts_menu = ttk.Combobox(tts_frame, textvariable=self.tts_var,
                                 values=tts_services, state='readonly', width=25)
@@ -1213,26 +1165,6 @@ TWITCH_OAUTH_TOKEN=
         self.tts_info_frame.grid(row=2, column=0, columnspan=3, sticky='ew', pady=10)
 
         # Create all info labels
-        self.gtts_info = tk.Label(
-            self.tts_info_frame,
-            text="The Google Translate TTS voice"
-                 "has multiple accents available (US, UK, AU, etc).",
-            bg=self.colors['bg'],
-            fg='#4CAF50',
-            font=(self.ui_font[0], 9),
-            wraplength=600,
-            justify='left'
-        )
-
-        self.piper_info = tk.Label(
-            self.tts_info_frame,
-            text="Piper TTS - Free, offline, high-quality neural voices.",
-            bg=self.colors['bg'],
-            fg='#4CAF50',
-            font=(self.ui_font[0], 9),
-            wraplength=600,
-            justify='left'
-        )
 
         self.se_info = tk.Label(
             self.tts_info_frame,
@@ -1247,16 +1179,6 @@ TWITCH_OAUTH_TOKEN=
         self.elevenlabs_info = tk.Label(
             self.tts_info_frame,
             text="ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=(self.ui_font[0], 9),
-            wraplength=600,
-            justify='left'
-        )
-
-        self.azure_info = tk.Label(
-            self.tts_info_frame,
-            text="Azure TTS - Microsoft official. Requires paid API key.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
@@ -2697,23 +2619,16 @@ TWITCH_OAUTH_TOKEN=
         service = self.tts_var.get()
         voices = self.voice_options.get(service, ['default'])
 
-        # Hide all info labels first (only if they exist)
-        if hasattr(self, 'gtts_info'):
-            for label in [self.gtts_info, self.piper_info, self.se_info,
-                          self.elevenlabs_info, self.azure_info]:
+        # Hide all info labels first
+        if hasattr(self, 'se_info'):
+            for label in [self.se_info, self.elevenlabs_info]:
                 label.pack_forget()
 
             # Show appropriate info label
-            if service == 'gtts':
-                self.gtts_info.pack(fill='x', pady=5)
-            elif service == 'piper':
-                self.piper_info.pack(fill='x', pady=5)
-            elif service == 'streamelements':
+            if service == 'streamelements':
                 self.se_info.pack(fill='x', pady=5)
             elif service == 'elevenlabs':
                 self.elevenlabs_info.pack(fill='x', pady=5)
-            elif service == 'azure':
-                self.azure_info.pack(fill='x', pady=5)
 
         if service == 'elevenlabs':
             if not voices or len(voices) == 0:
