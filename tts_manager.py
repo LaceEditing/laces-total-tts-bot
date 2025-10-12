@@ -1,6 +1,6 @@
 ﻿"""
-TTS Manager - PRODUCTION BUILD (No Console Output)
-Audio-reactive avatar with suppressed console windows
+TTS Manager - PRODUCTION BUILD
+Fixed gTTS and Piper implementations
 """
 
 import os
@@ -14,63 +14,43 @@ import numpy as np
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
 
-# Suppress ALL console output from subprocess (ffmpeg)
+# Suppress console output (keeping existing suppression code)
 if sys.platform == 'win32':
     import subprocess
-
-    # CREATE_NO_WINDOW flag
     CREATE_NO_WINDOW = 0x08000000
-
-    # Store original Popen
     _original_popen = subprocess.Popen
 
-
     def _silent_popen(*args, **kwargs):
-        """Completely suppress console windows for all subprocesses"""
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
         startupinfo.wShowWindow = subprocess.SW_HIDE
-
         if 'creationflags' not in kwargs:
             kwargs['creationflags'] = 0
         kwargs['creationflags'] |= CREATE_NO_WINDOW
         kwargs['startupinfo'] = startupinfo
-
         return _original_popen(*args, **kwargs)
 
-
-    # Monkey-patch subprocess globally
     subprocess.Popen = _silent_popen
 
-# Set ffmpeg paths for PyInstaller bundle
 if hasattr(sys, '_MEIPASS'):
     bundle_dir = sys._MEIPASS
     ffmpeg_exe = os.path.join(bundle_dir, 'ffmpeg.exe')
     ffprobe_exe = os.path.join(bundle_dir, 'ffprobe.exe')
-
     if os.path.exists(ffmpeg_exe):
         os.environ['FFMPEG_BINARY'] = ffmpeg_exe
         os.environ['PATH'] = bundle_dir + os.pathsep + os.environ.get('PATH', '')
-
     if os.path.exists(ffprobe_exe):
         os.environ['FFPROBE_BINARY'] = ffprobe_exe
 
-# Import pydub after setting paths
 try:
     from pydub import AudioSegment
-
     if hasattr(sys, '_MEIPASS'):
         ffmpeg_path = os.path.join(sys._MEIPASS, 'ffmpeg.exe')
         if os.path.exists(ffmpeg_path):
             AudioSegment.converter = ffmpeg_path
-
-    # Additional subprocess suppression for pydub
     if sys.platform == 'win32':
         import subprocess
-
         _pydub_original = subprocess.Popen
-
-
         def _pydub_silent(*args, **kwargs):
             startupinfo = subprocess.STARTUPINFO()
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
@@ -80,10 +60,7 @@ try:
                 kwargs['creationflags'] = 0
             kwargs['creationflags'] |= CREATE_NO_WINDOW
             return _pydub_original(*args, **kwargs)
-
-
         subprocess.Popen = _pydub_silent
-
 except Exception:
     AudioSegment = None
 
@@ -108,10 +85,8 @@ class TTSManager:
             os.environ['SDL_VIDEODRIVER'] = 'dummy'
             os.environ['SDL_AUDIODRIVER'] = 'directsound'
 
-        # Initialize pygame mixer (suppress output)
         import io
         import contextlib
-
         f = io.StringIO()
         with contextlib.redirect_stdout(f):
             pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
@@ -132,7 +107,7 @@ class TTSManager:
         self.volume_history = []
         self.audio_data = None
 
-        # Callbacks for avatar switching
+        # Callbacks
         self.on_audio_start = None
         self.on_audio_active = None
         self.on_audio_silent = None
@@ -159,8 +134,10 @@ class TTSManager:
                 audio_file = self._elevenlabs_tts(text)
             elif self.service == 'streamelements':
                 audio_file = self._streamelements_tts(text)
-            elif self.service == 'coqui-tts':
-                audio_file = self._coqui_tts(text)
+            elif self.service == 'gtts':
+                audio_file = self._gtts_tts(text)
+            elif self.service == 'piper':
+                audio_file = self._piper_tts(text)
             elif self.service == 'azure':
                 audio_file = self._azure_tts(text)
             else:
@@ -176,7 +153,8 @@ class TTSManager:
                 if callback_on_end:
                     callback_on_end()
 
-        except Exception:
+        except Exception as e:
+            print(f"[TTS] Error in speak: {e}")
             if callback_on_end:
                 callback_on_end()
 
@@ -188,16 +166,13 @@ class TTSManager:
                     if AudioSegment is None:
                         self.audio_data = None
                         return
-
                     audio = AudioSegment.from_mp3(str(audio_file))
                     samples = np.array(audio.get_array_of_samples())
                     sample_rate = audio.frame_rate
-
                     if audio.sample_width == 2:
                         samples = samples / 32768.0
                     elif audio.sample_width == 1:
                         samples = samples / 128.0
-
                 except Exception:
                     self.audio_data = None
                     return
@@ -205,7 +180,6 @@ class TTSManager:
                 try:
                     from scipy.io import wavfile
                     sample_rate, samples = wavfile.read(str(audio_file))
-
                     if samples.dtype == np.int16:
                         samples = samples / 32768.0
                     elif samples.dtype == np.int8:
@@ -232,7 +206,6 @@ class TTSManager:
                 'window_duration': 0.01,
                 'max_volume': max(volume_envelope) if volume_envelope else 1.0
             }
-
         except Exception:
             self.audio_data = None
 
@@ -301,7 +274,6 @@ class TTSManager:
                             self.on_audio_active()
                         last_state = True
                         state_start_time = current_time
-
                     elif not is_active and state_duration >= self.min_speech_duration:
                         self.audio_active = False
                         if self.on_audio_silent:
@@ -310,7 +282,6 @@ class TTSManager:
                         state_start_time = current_time
 
                 time.sleep(0.01)
-
             except Exception:
                 break
 
@@ -318,14 +289,11 @@ class TTSManager:
         """Get volume level at specific playback position"""
         if not self.audio_data:
             return 0.5
-
         window_idx = int(position / self.audio_data['window_duration'])
         envelope = self.audio_data['volume_envelope']
-
         if 0 <= window_idx < len(envelope):
             normalized = envelope[window_idx] / self.audio_data['max_volume']
             return normalized
-
         return 0.0
 
     def get_current_volume(self):
@@ -367,7 +335,6 @@ class TTSManager:
                     f.write(chunk)
 
             return audio_file
-
         except Exception:
             return None
 
@@ -379,9 +346,7 @@ class TTSManager:
             params = {'voice': voice_name, 'text': text}
 
             response = requests.get(url, params=params, timeout=15)
-
             if response.status_code != 200:
-                print(f"[TTS] StreamElements error: Status {response.status_code} for voice '{voice_name}'")
                 return None
 
             timestamp = str(int(time.time() * 1000))
@@ -392,35 +357,216 @@ class TTSManager:
                     if chunk:
                         f.write(chunk)
 
-            # Verify file exists and has content
             if audio_file.exists() and audio_file.stat().st_size > 1000:
                 return audio_file
             else:
-                print(
-                    f"[TTS] StreamElements: Voice '{voice_name}' created invalid file ({audio_file.stat().st_size if audio_file.exists() else 0} bytes)")
                 if audio_file.exists():
                     audio_file.unlink()
                 return None
+        except Exception:
+            return None
+
+    def _gtts_tts(self, text):
+        """Generate speech using Google Translate TTS (free!)"""
+        try:
+            from gtts import gTTS
+
+            # Extract language/accent from voice setting
+            # Format: "en-us" or "en-uk" etc.
+            lang = self.voice if self.voice != 'default' else 'en'
+
+            # Parse tld (top level domain) for accent
+            # en-us -> lang=en, tld=com
+            # en-uk -> lang=en, tld=co.uk
+            # en-au -> lang=en, tld=com.au
+            tld_map = {
+                'en': 'com',
+                'en-us': 'com',
+                'en-uk': 'co.uk',
+                'en-gb': 'co.uk',
+                'en-au': 'com.au',
+                'en-ca': 'ca',
+                'en-in': 'co.in',
+                'es': 'com.mx',
+                'fr': 'fr',
+                'de': 'de',
+                'it': 'it',
+                'pt': 'com.br',
+                'ja': 'co.jp',
+                'ko': 'co.kr',
+                'zh-cn': 'com',
+            }
+
+            # Get base language (first 2 chars)
+            base_lang = lang[:2] if len(lang) >= 2 else 'en'
+            tld = tld_map.get(lang, 'com')
+
+            print(f"[TTS] gTTS - Language: {base_lang}, TLD: {tld}, Accent: {lang}")
+
+            # slow=False for natural speed
+            tts = gTTS(text=text, lang=base_lang, tld=tld, slow=False)
+
+            timestamp = str(int(time.time() * 1000))
+            audio_file = self.audio_folder / f'gtts_{timestamp}.mp3'
+
+            tts.save(str(audio_file))
+
+            if audio_file.exists() and audio_file.stat().st_size > 1000:
+                print(f"[TTS] gTTS - File created: {audio_file.stat().st_size} bytes")
+                return audio_file
+            return None
 
         except Exception as e:
-            print(f"[TTS] StreamElements error with '{voice_name}': {e}")
+            print(f"[TTS] gTTS error: {e}")
             import traceback
             traceback.print_exc()
             return None
 
-    def _coqui_tts(self, text):
-        """Generate speech using Coqui TTS"""
+    def _piper_tts(self, text):
+        """Generate speech using Piper TTS via command line (free, high-quality, offline!)"""
         try:
-            from TTS.api import TTS
-            tts = TTS(model_name="tts_models/en/ljspeech/tacotron2-DDC",
-                      progress_bar=False, gpu=False)
+            # Use piper via command line (more reliable than Python API)
+            import subprocess
+
+            # Voice name from selection
+            voice_name = self.voice if self.voice != 'default' else 'en_US-lessac-medium'
+
+            # Download voice model if needed
+            model_path = self._download_piper_model(voice_name)
+            if not model_path:
+                print(f"[TTS] Piper - Could not get model for {voice_name}")
+                return None
 
             timestamp = str(int(time.time() * 1000))
-            audio_file = self.audio_folder / f'coqui_{timestamp}.wav'
-            tts.tts_to_file(text=text, file_path=str(audio_file))
-            return audio_file
+            audio_file = self.audio_folder / f'piper_{timestamp}.wav'
 
-        except Exception:
+            print(f"[TTS] Piper - Generating speech with {voice_name}")
+
+            # Run piper command line tool
+            # piper --model <model> --output_file <output> < input.txt
+            piper_cmd = ['piper', '--model', str(model_path), '--output_file', str(audio_file)]
+
+            result = subprocess.run(
+                piper_cmd,
+                input=text.encode('utf-8'),
+                capture_output=True,
+                timeout=30
+            )
+
+            if result.returncode == 0 and audio_file.exists():
+                file_size = audio_file.stat().st_size
+                if file_size > 1000:
+                    print(f"[TTS] Piper - Success! File: {file_size} bytes")
+                    return audio_file
+                else:
+                    print(f"[TTS] Piper - File too small: {file_size} bytes")
+            else:
+                print(f"[TTS] Piper - Command failed: {result.stderr.decode()}")
+
+            return None
+
+        except FileNotFoundError:
+            print("[TTS] Piper command not found! Install: pip install piper-tts")
+            return None
+        except Exception as e:
+            print(f"[TTS] Piper error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _download_piper_model(self, voice_name):
+        """Download Piper voice model if not present"""
+        try:
+            models_dir = Path('piper_models')
+            models_dir.mkdir(exist_ok=True)
+
+            model_file = models_dir / f"{voice_name}.onnx"
+            config_file = models_dir / f"{voice_name}.onnx.json"
+
+            # If already exists, return it
+            if model_file.exists() and config_file.exists():
+                return model_file
+
+            # Download from HuggingFace
+            print(f"[TTS] Downloading Piper model: {voice_name} (~20-50MB, first time only)...")
+
+            base_url = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
+
+            # Map voice names to paths - COMPREHENSIVE LIST
+            voice_paths = {
+                # === US English ===
+                'en_US-lessac-medium': 'en/en_US/lessac/medium/en_US-lessac-medium',
+                'en_US-lessac-high': 'en/en_US/lessac/high/en_US-lessac-high',
+                'en_US-lessac-low': 'en/en_US/lessac/low/en_US-lessac-low',
+                'en_US-amy-medium': 'en/en_US/amy/medium/en_US-amy-medium',
+                'en_US-amy-low': 'en/en_US/amy/low/en_US-amy-low',
+                'en_US-danny-low': 'en/en_US/danny/low/en_US-danny-low',
+                'en_US-kathleen-low': 'en/en_US/kathleen/low/en_US-kathleen-low',
+                'en_US-ryan-high': 'en/en_US/ryan/high/en_US-ryan-high',
+                'en_US-ryan-medium': 'en/en_US/ryan/medium/en_US-ryan-medium',
+                'en_US-ryan-low': 'en/en_US/ryan/low/en_US-ryan-low',
+                'en_US-joe-medium': 'en/en_US/joe/medium/en_US-joe-medium',
+                'en_US-kristin-medium': 'en/en_US/kristin/medium/en_US-kristin-medium',
+                'en_US-kusal-medium': 'en/en_US/kusal/medium/en_US-kusal-medium',
+                'en_US-l2arctic-medium': 'en/en_US/l2arctic/medium/en_US-l2arctic-medium',
+                'en_US-libritts-high': 'en/en_US/libritts/high/en_US-libritts-high',
+                'en_US-libritts_r-medium': 'en/en_US/libritts_r/medium/en_US-libritts_r-medium',
+
+                # === British English ===
+                'en_GB-alan-medium': 'en/en_GB/alan/medium/en_GB-alan-medium',
+                'en_GB-alan-low': 'en/en_GB/alan/low/en_GB-alan-low',
+                'en_GB-alba-medium': 'en/en_GB/alba/medium/en_GB-alba-medium',
+                'en_GB-cori-medium': 'en/en_GB/cori/medium/en_GB-cori-medium',
+                'en_GB-cori-high': 'en/en_GB/cori/high/en_GB-cori-high',
+                'en_GB-jenny_dioco-medium': 'en/en_GB/jenny_dioco/medium/en_GB-jenny_dioco-medium',
+                'en_GB-northern_english_male-medium': 'en/en_GB/northern_english_male/medium/en_GB-northern_english_male-medium',
+                'en_GB-semaine-medium': 'en/en_GB/semaine/medium/en_GB-semaine-medium',
+                'en_GB-southern_english_male-medium': 'en/en_GB/southern_english_male/medium/en_GB-southern_english_male-medium',
+                'en_GB-vctk-medium': 'en/en_GB/vctk/medium/en_GB-vctk-medium',
+
+                # === Other English Accents ===
+                'en_AU-nat-medium': 'en/en_AU/nat/medium/en_AU-nat-medium',
+                'en_IN-tejas-medium': 'en/en_IN/tejas/medium/en_IN-tejas-medium',
+            }
+
+            if voice_name not in voice_paths:
+                print(f"[TTS] Unknown voice: {voice_name}")
+                return None
+
+            voice_path = voice_paths[voice_name]
+
+            # Download model file
+            model_url = f"{base_url}/{voice_path}.onnx"
+            response = requests.get(model_url, timeout=120)
+            if response.status_code == 200:
+                with open(model_file, 'wb') as f:
+                    f.write(response.content)
+                print(f"[TTS] Model downloaded: {len(response.content)} bytes")
+            else:
+                print(f"[TTS] Failed to download model: {response.status_code}")
+                return None
+
+            # Download config file
+            config_url = f"{base_url}/{voice_path}.onnx.json"
+            response = requests.get(config_url, timeout=30)
+            if response.status_code == 200:
+                with open(config_file, 'wb') as f:
+                    f.write(response.content)
+                print(f"[TTS] Config downloaded")
+            else:
+                print(f"[TTS] Failed to download config: {response.status_code}")
+                return None
+
+            if model_file.exists() and config_file.exists():
+                print(f"[TTS] Piper voice ready!")
+                return model_file
+
+            return None
+
+        except Exception as e:
+            print(f"[TTS] Error downloading Piper model: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _azure_tts(self, text):
@@ -448,7 +594,6 @@ class TTSManager:
             if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
                 return audio_file
             return None
-
         except Exception:
             return None
 
@@ -464,25 +609,21 @@ class TTSManager:
 
 
 if __name__ == '__main__':
-    print("Testing Audio-Reactive TTS...")
+    print("Testing Free TTS Options...")
 
-    def on_start():
-        print("🎬 [START] Audio playback started")
+    # Test gTTS with different accents
+    print("\n1. Testing gTTS (US accent)...")
+    tts = TTSManager(service='gtts', voice='en-us')
+    tts.speak("Hello! This is Google Translate with a US accent.")
+    time.sleep(2)
 
-    def on_active():
-        print("   🎤 [MOUTH OPEN] Volume above threshold - SPEAKING")
+    print("\n2. Testing gTTS (UK accent)...")
+    tts = TTSManager(service='gtts', voice='en-uk')
+    tts.speak("Hello! This is Google Translate with a British accent.")
+    time.sleep(2)
 
-    def on_silent():
-        print("   🤐 [MOUTH CLOSED] Volume below threshold - SILENT")
+    print("\n3. Testing Piper...")
+    tts = TTSManager(service='piper', voice='en_US-lessac-medium')
+    tts.speak("Hello! This is Piper TTS. I'm high quality and completely free!")
 
-    def on_end():
-        print("🎬 [END] Audio playback finished")
-
-    tts = TTSManager(service='streamelements', voice='Brian')
-    tts.set_volume_threshold(0.02)  # Adjust sensitivity
-    tts.set_audio_callbacks(on_start=on_start, on_active=on_active, on_silent=on_silent, on_end=on_end)
-
-    test_text = "Hello! This is a test. Notice how the mouth opens and closes naturally with the speech. Pretty cool, right?"
-    tts.speak(test_text)
-
-    print("\n✅ Test complete!")
+    print("\n✅ Tests complete!")

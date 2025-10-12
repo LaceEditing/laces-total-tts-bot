@@ -213,3 +213,4 @@ ffmpeg.exe
 ffmpeg_binaries/ffmpeg.exe
 ffmpeg_binaries/ffprobe.exe
 ffprobe.exe
+*.onnx

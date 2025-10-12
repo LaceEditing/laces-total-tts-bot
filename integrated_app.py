@@ -70,44 +70,59 @@ class IntegratedChatbotApp:
         self.voice_options = {
             'elevenlabs': [],
             'streamelements': [
-                # US English Voices
-                'Brian',  # Male US
-                'Ivy',  # Female US
-                'Joanna',  # Female US
-                'Joey',  # Male US
-                'Justin',  # Male US
-                'Kendra',  # Female US
-                'Kimberly',  # Female US
-                'Matthew',  # Male US
-                'Salli',  # Female US
-
-                # British/Welsh English Voices
-                'Amy',  # Female British
-                'Emma',  # Female British
-                'Geraint',  # Male Welsh
-                'Ron',  # Male British
-
-                # Australian English Voices
-                'Nicole',  # Female Australian
-                'Russell',  # Male Australian
-
-                # Indian English Voices
-                'Raveena'  # Female Indian
+                'Brian', 'Ivy', 'Justin', 'Russell', 'Nicole', 'Emma',
+                'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
+                'Matthew', 'Geraint', 'Raveena', 'Ron'
             ],
-            'azure': ['en-US-JennyNeural', 'en-US-GuyNeural', 'en-US-AriaNeural',
-                      'en-US-DavisNeural', 'en-US-AmberNeural', 'en-US-AshleyNeural',
-                      'en-US-BrandonNeural', 'en-US-ChristopherNeural'],
-            'coqui-tts': ['default']
-        }
-        self.voice_options = {
-            'elevenlabs': [],
-            'streamelements': ['Brian', 'Ivy', 'Justin', 'Russell', 'Nicole', 'Emma',
-                              'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
-                              'Matthew', 'Geraint', 'Raveena', 'Ron',],
-            'azure': ['en-US-JennyNeural', 'en-US-GuyNeural', 'en-US-AriaNeural',
-                     'en-US-DavisNeural', 'en-US-AmberNeural', 'en-US-AshleyNeural',
-                     'en-US-BrandonNeural', 'en-US-ChristopherNeural'],
-            'coqui-tts': ['default']
+            'gtts': [
+                # Format: "language-accent" - gTTS only has ONE voice per language
+                # These control ACCENT (via TLD), not different voices
+                'en-us',  # English (US accent)
+                'en-uk',  # English (UK accent)
+                'en-au',  # English (Australian accent)
+                'en-ca',  # English (Canadian accent)
+                'en-in',  # English (Indian accent)
+                'es',  # Spanish
+                'fr',  # French
+                'de',  # German
+                'it',  # Italian
+                'pt',  # Portuguese
+                'ja',  # Japanese
+                'ko',  # Korean
+                'zh-cn',  # Chinese (Simplified)
+            ],
+            'piper': [
+                # === US English - Best Quality ===
+                'en_US-lessac-medium',     # Male - RECOMMENDED! Best quality/speed balance
+                'en_US-lessac-high',       # Male - Even higher quality (larger download)
+                'en_US-amy-medium',        # Female - High quality
+                'en_US-ryan-high',         # Male - Very natural sounding
+                'en_US-kristin-medium',    # Female - Clear and articulate
+                'en_US-joe-medium',        # Male - Natural voice
+
+                # === US English - More Options ===
+                'en_US-ryan-medium',       # Male - Good quality
+                'en_US-amy-low',           # Female - Faster (lower quality)
+                'en_US-kathleen-low',      # Female - Older voice
+                'en_US-danny-low',         # Male - Young voice
+                'en_US-kusal-medium',      # Male - Deep voice
+                'en_US-libritts_r-medium', # Multiple speakers
+
+                # === British English - FULL COLLECTION ===
+                'en_GB-cori-high',         # Female - BEST British voice!
+                'en_GB-cori-medium',       # Female - Southern British
+                'en_GB-alan-medium',       # Male - Clear British accent
+                'en_GB-alba-medium',       # Female - Scottish accent
+                'en_GB-jenny_dioco-medium', # Female - Natural British
+                'en_GB-northern_english_male-medium',  # Male - Northern England
+                'en_GB-southern_english_male-medium',  # Male - Southern England
+                'en_GB-semaine-medium',    # Female - Expressive
+                'en_GB-alan-low',          # Male - Faster version
+
+                # === Other Accents ===
+                'en_AU-nat-medium',        # Male - Australian
+                'en_IN-tejas-medium',      # Male - Indian English
+            ],
         }
 
         self.create_gui()
@@ -1148,13 +1163,13 @@ TWITCH_OAUTH_TOKEN=
         tts_frame.grid_columnconfigure(1, weight=1)
 
         tk.Label(tts_frame, text="TTS Service:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
-        tts_services = ['elevenlabs', 'streamelements', 'coqui-tts', 'azure']
+        tts_services = ['streamelements', 'gtts', 'piper', 'elevenlabs', 'azure']
         self.tts_var = tk.StringVar(value=self.config['tts_service'])
         tts_menu = ttk.Combobox(tts_frame, textvariable=self.tts_var,
-                               values=tts_services, state='readonly', width=25)
+                                values=tts_services, state='readonly', width=25)
         tts_menu.grid(row=0, column=1, sticky='w', pady=5)
         tts_menu.bind('<<ComboboxSelected>>', self.on_tts_change)
 
@@ -1163,8 +1178,8 @@ TWITCH_OAUTH_TOKEN=
         voice_section.grid_columnconfigure(1, weight=1)
 
         tk.Label(voice_section, text="Voice:",
-                bg=self.colors['bg'], fg=self.colors['fg'],
-                font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
         self.voice_var = tk.StringVar(value=self.config.get('elevenlabs_voice', 'rachel'))
         self.voice_menu = ttk.Combobox(voice_section, textvariable=self.voice_var,
@@ -1198,6 +1213,63 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 9, 'italic')
         )
         self.voice_info_label.grid(row=1, column=0, columnspan=3, sticky='w', pady=5)
+
+        # Create info frame for TTS service descriptions
+        self.tts_info_frame = tk.Frame(voice_section, bg=self.colors['bg'])
+        self.tts_info_frame.grid(row=2, column=0, columnspan=3, sticky='ew', pady=10)
+
+        # Create all info labels
+        self.gtts_info = tk.Label(
+            self.tts_info_frame,
+            text="🆓 Google Translate TTS - Free, reliable. NOTE: Only ONE voice per language, "
+                 "but multiple accents available (US, UK, AU, etc). Voice selections control accent, not different speakers.",
+            bg=self.colors['bg'],
+            fg='#4CAF50',
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
+
+        self.piper_info = tk.Label(
+            self.tts_info_frame,
+            text="🆓 Piper TTS - Free, offline, high-quality neural voices. Best free option! "
+                 "First use downloads ~20-50MB voice model.",
+            bg=self.colors['bg'],
+            fg='#4CAF50',
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
+
+        self.se_info = tk.Label(
+            self.tts_info_frame,
+            text="🆓 StreamElements - Free, reliable, popular with streamers. No API key needed.",
+            bg=self.colors['bg'],
+            fg='#4CAF50',
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
+
+        self.elevenlabs_info = tk.Label(
+            self.tts_info_frame,
+            text="💎 ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
+
+        self.azure_info = tk.Label(
+            self.tts_info_frame,
+            text="🏢 Azure TTS - Microsoft official, enterprise-grade. Requires paid API key.",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
 
         self.elevenlabs_settings_section = self.create_section(scrollable, "ElevenLabs Voice Settings", 2)
 
@@ -2631,6 +2703,24 @@ TWITCH_OAUTH_TOKEN=
         """Update voice dropdown based on selected TTS service"""
         service = self.tts_var.get()
         voices = self.voice_options.get(service, ['default'])
+
+        # Hide all info labels first (only if they exist)
+        if hasattr(self, 'gtts_info'):
+            for label in [self.gtts_info, self.piper_info, self.se_info,
+                          self.elevenlabs_info, self.azure_info]:
+                label.pack_forget()
+
+            # Show appropriate info label
+            if service == 'gtts':
+                self.gtts_info.pack(fill='x', pady=5)
+            elif service == 'piper':
+                self.piper_info.pack(fill='x', pady=5)
+            elif service == 'streamelements':
+                self.se_info.pack(fill='x', pady=5)
+            elif service == 'elevenlabs':
+                self.elevenlabs_info.pack(fill='x', pady=5)
+            elif service == 'azure':
+                self.azure_info.pack(fill='x', pady=5)
 
         if service == 'elevenlabs':
             if not voices or len(voices) == 0:

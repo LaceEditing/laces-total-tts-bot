@@ -21,9 +21,10 @@ keyboard>=0.13.5
 # GUI (included with Python)
 # tkinter - comes with Python
 
-# Optional TTS engines
-azure-cognitiveservices-speech>=1.34.0  # Azure TTS
-coqui-tts  # Coqui TTS (open source)
+# TTS engines
+azure-cognitiveservices-speech>=1.34.0  # Azure TTS (paid)
+gTTS>=2.5.0  # Google Translate TTS (FREE!)
+piper-tts>=1.2.0  # Piper TTS (FREE, offline, high-quality!)
 
 # HTTP requests
 requests>=2.31.0
