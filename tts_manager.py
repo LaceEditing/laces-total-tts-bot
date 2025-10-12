@@ -401,8 +401,6 @@ class TTSManager:
             base_lang = lang[:2] if len(lang) >= 2 else 'en'
             tld = tld_map.get(lang, 'com')
 
-            print(f"[TTS] gTTS - Language: {base_lang}, TLD: {tld}, Accent: {lang}")
-
             # slow=False for natural speed
             tts = gTTS(text=text, lang=base_lang, tld=tld, slow=False)
 
@@ -439,8 +437,6 @@ class TTSManager:
 
             timestamp = str(int(time.time() * 1000))
             audio_file = self.audio_folder / f'piper_{timestamp}.wav'
-
-            print(f"[TTS] Piper - Generating speech with {voice_name}")
 
             # Run piper command line tool
             # piper --model <model> --output_file <output> < input.txt
@@ -488,8 +484,6 @@ class TTSManager:
                 return model_file
 
             # Download from HuggingFace
-            print(f"[TTS] Downloading Piper model: {voice_name} (~20-50MB, first time only)...")
-
             base_url = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
 
             # Map voice names to paths - COMPREHENSIVE LIST
@@ -558,13 +552,11 @@ class TTSManager:
                 return None
 
             if model_file.exists() and config_file.exists():
-                print(f"[TTS] Piper voice ready!")
                 return model_file
 
             return None
 
         except Exception as e:
-            print(f"[TTS] Error downloading Piper model: {e}")
             import traceback
             traceback.print_exc()
             return None
@@ -609,21 +601,15 @@ class TTSManager:
 
 
 if __name__ == '__main__':
-    print("Testing Free TTS Options...")
 
     # Test gTTS with different accents
-    print("\n1. Testing gTTS (US accent)...")
     tts = TTSManager(service='gtts', voice='en-us')
     tts.speak("Hello! This is Google Translate with a US accent.")
     time.sleep(2)
 
-    print("\n2. Testing gTTS (UK accent)...")
     tts = TTSManager(service='gtts', voice='en-uk')
     tts.speak("Hello! This is Google Translate with a British accent.")
     time.sleep(2)
 
-    print("\n3. Testing Piper...")
     tts = TTSManager(service='piper', voice='en_US-lessac-medium')
     tts.speak("Hello! This is Piper TTS. I'm high quality and completely free!")
-
-    print("\n✅ Tests complete!")

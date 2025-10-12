@@ -1,8 +1,4 @@
-﻿"""
-Complete AI Chatbot System - Integrated Application
-UPDATED: Dark Mode Red Theme + Quicksand Font Fixed
-"""
-import os
+﻿import os
 import sys
 import time
 import tkinter as tk
@@ -92,36 +88,34 @@ class IntegratedChatbotApp:
                 'zh-cn',  # Chinese (Simplified)
             ],
             'piper': [
-                # === US English - Best Quality ===
-                'en_US-lessac-medium',     # Male - RECOMMENDED! Best quality/speed balance
-                'en_US-lessac-high',       # Male - Even higher quality (larger download)
-                'en_US-amy-medium',        # Female - High quality
-                'en_US-ryan-high',         # Male - Very natural sounding
-                'en_US-kristin-medium',    # Female - Clear and articulate
-                'en_US-joe-medium',        # Male - Natural voice
+                # === US English ===
+                'en_US-lessac-medium',
+                'en_US-lessac-high',
+                'en_US-amy-medium',
+                'en_US-ryan-high',
+                'en_US-kristin-medium',
+                'en_US-joe-medium',
+                'en_US-ryan-medium',
+                'en_US-amy-low',
+                'en_US-kathleen-low',
+                'en_US-danny-low',
+                'en_US-kusal-medium',
+                'en_US-libritts_r-medium',
 
-                # === US English - More Options ===
-                'en_US-ryan-medium',       # Male - Good quality
-                'en_US-amy-low',           # Female - Faster (lower quality)
-                'en_US-kathleen-low',      # Female - Older voice
-                'en_US-danny-low',         # Male - Young voice
-                'en_US-kusal-medium',      # Male - Deep voice
-                'en_US-libritts_r-medium', # Multiple speakers
-
-                # === British English - FULL COLLECTION ===
-                'en_GB-cori-high',         # Female - BEST British voice!
-                'en_GB-cori-medium',       # Female - Southern British
-                'en_GB-alan-medium',       # Male - Clear British accent
-                'en_GB-alba-medium',       # Female - Scottish accent
-                'en_GB-jenny_dioco-medium', # Female - Natural British
-                'en_GB-northern_english_male-medium',  # Male - Northern England
-                'en_GB-southern_english_male-medium',  # Male - Southern England
-                'en_GB-semaine-medium',    # Female - Expressive
-                'en_GB-alan-low',          # Male - Faster version
+                # === British English ===
+                'en_GB-cori-high',
+                'en_GB-cori-medium',
+                'en_GB-alan-medium',
+                'en_GB-alba-medium',
+                'en_GB-jenny_dioco-medium',
+                'en_GB-northern_english_male-medium',
+                'en_GB-southern_english_male-medium',
+                'en_GB-semaine-medium',
+                'en_GB-alan-low',
 
                 # === Other Accents ===
-                'en_AU-nat-medium',        # Male - Australian
-                'en_IN-tejas-medium',      # Male - Indian English
+                'en_AU-nat-medium',
+                'en_IN-tejas-medium',
             ],
         }
 
@@ -756,7 +750,7 @@ TWITCH_OAUTH_TOKEN=
 
         info_label = tk.Label(
             config_frame,
-            text="💡 Crazy Epic Tip: gpt-4o supports vision & is the most capable.",
+            text="Crazy Epic Tip: gpt-4o supports vision & is the most capable.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9, 'italic')
@@ -959,7 +953,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(
             memory_section,
-            text="Higher = more memory but more expensive. GPT-4o supports up to 128K tokens.",
+            text="Higher = more memory but more expensive.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9, 'italic')
@@ -1221,8 +1215,8 @@ TWITCH_OAUTH_TOKEN=
         # Create all info labels
         self.gtts_info = tk.Label(
             self.tts_info_frame,
-            text="🆓 Google Translate TTS - Free, reliable. NOTE: Only ONE voice per language, "
-                 "but multiple accents available (US, UK, AU, etc). Voice selections control accent, not different speakers.",
+            text="The Google Translate TTS voice"
+                 "has multiple accents available (US, UK, AU, etc).",
             bg=self.colors['bg'],
             fg='#4CAF50',
             font=(self.ui_font[0], 9),
@@ -1232,8 +1226,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.piper_info = tk.Label(
             self.tts_info_frame,
-            text="🆓 Piper TTS - Free, offline, high-quality neural voices. Best free option! "
-                 "First use downloads ~20-50MB voice model.",
+            text="Piper TTS - Free, offline, high-quality neural voices.",
             bg=self.colors['bg'],
             fg='#4CAF50',
             font=(self.ui_font[0], 9),
@@ -1243,7 +1236,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.se_info = tk.Label(
             self.tts_info_frame,
-            text="🆓 StreamElements - Free, reliable, popular with streamers. No API key needed.",
+            text="StreamElements - Free, reliable, popular with streamers.",
             bg=self.colors['bg'],
             fg='#4CAF50',
             font=(self.ui_font[0], 9),
@@ -1253,7 +1246,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.elevenlabs_info = tk.Label(
             self.tts_info_frame,
-            text="💎 ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
+            text="ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
@@ -1263,7 +1256,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.azure_info = tk.Label(
             self.tts_info_frame,
-            text="🏢 Azure TTS - Microsoft official, enterprise-grade. Requires paid API key.",
+            text="Azure TTS - Microsoft official. Requires paid API key.",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
@@ -1398,7 +1391,7 @@ TWITCH_OAUTH_TOKEN=
 
         test_voice_btn = tk.Button(
             test_voice_section,
-            text="🎵 Test Voice",
+            text="Test Voice",
             command=self.test_voice,
             bg='#2196F3',
             fg='white',
@@ -1503,7 +1496,7 @@ TWITCH_OAUTH_TOKEN=
 
         test_screenshot_btn = tk.Button(
             screen_section,
-            text="📸 Test Screenshot Capture",
+            text="Test Screenshot Capture",
             command=self.test_screenshot,
             bg='#2196F3',
             fg='white',
@@ -2373,7 +2366,7 @@ TWITCH_OAUTH_TOKEN=
 
         self.screenshot_btn = tk.Button(
             center_frame,
-            text="📸 Screenshot & Respond",
+            text="Screenshot & Respond",
             command=self.screenshot_and_respond,
             bg='#FF6B6B',
             fg='white',
@@ -2727,7 +2720,7 @@ TWITCH_OAUTH_TOKEN=
                 self.voice_menu['values'] = ['⚠️ Click "Refresh Voices" to load']
                 self.voice_var.set('⚠️ Click "Refresh Voices" to load')
                 self.voice_info_label.config(
-                    text="👆 Click 'Refresh Voices' to load your ElevenLabs voices",
+                    text="Click 'Refresh Voices' to load your ElevenLabs voices",
                     fg=self.colors['accent']
                 )
             else:

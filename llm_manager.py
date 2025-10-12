@@ -1,9 +1,4 @@
-﻿"""
-LLM Manager - PRODUCTION BUILD (No Console Output)
-Handles OpenAI API interactions with conversation history
-"""
-
-import os
+﻿import os
 from openai import OpenAI
 import tiktoken
 
@@ -183,13 +178,3 @@ if __name__ == '__main__':
         model='gpt-4o',
         system_prompt='You are a friendly AI named Bob.'
     )
-
-    print("Testing LLM Manager...")
-    response = llm.chat("Hello! What's your name?")
-    print(f"Response: {response}")
-
-    response = llm.chat("What can you help me with?")
-    print(f"Response: {response}")
-
-    print(f"\nConversation has {len(llm.chat_history)} messages")
-    print(f"Total tokens: {llm.count_tokens(llm.chat_history)}")

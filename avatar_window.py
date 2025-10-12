@@ -1,10 +1,4 @@
-﻿"""
-Avatar Window - Dedicated window for avatar display
-Can be captured by OBS via Window Capture
-Updates in real-time when bot speaks/is idle
-"""
-
-import tkinter as tk
+﻿import tkinter as tk
 from PIL import Image, ImageTk
 from pathlib import Path
 
@@ -70,8 +64,6 @@ class AvatarWindow:
         # Bind resize event to update image size
         self.window.bind('<Configure>', self.on_resize)
 
-        print("[Avatar Window] Created successfully")
-
     def load_images(self, idle_path, speaking_path):
         """Load idle and speaking images"""
         self.idle_path = idle_path
@@ -81,18 +73,15 @@ class AvatarWindow:
             # Load idle image
             if idle_path and Path(idle_path).exists():
                 self.idle_photo = self.load_and_resize_image(idle_path)
-                print(f"[Avatar Window] Loaded idle image: {idle_path}")
 
             # Load speaking image
             if speaking_path and Path(speaking_path).exists():
                 self.speaking_photo = self.load_and_resize_image(speaking_path)
-                print(f"[Avatar Window] Loaded speaking image: {speaking_path}")
 
             # Display initial image (idle)
             self.show_idle()
 
         except Exception as e:
-            print(f"[Avatar Window] Error loading images: {e}")
             self.image_label.config(
                 text=f"Error loading images:\n{e}",
                 image=''
@@ -155,12 +144,10 @@ class AvatarWindow:
     def show(self):
         """Show the avatar window"""
         self.window.deiconify()
-        print("[Avatar Window] Shown")
 
     def hide(self):
         """Hide (minimize) the avatar window"""
         self.window.withdraw()
-        print("[Avatar Window] Hidden")
 
     def toggle(self):
         """Toggle window visibility"""
@@ -195,12 +182,10 @@ if __name__ == '__main__':
 
     # Simulate speaking/idle cycle
     def test_cycle():
-        print("Showing idle...")
         avatar.show_idle()
         root.after(2000, lambda: test_speaking())
 
     def test_speaking():
-        print("Showing speaking...")
         avatar.show_speaking()
         root.after(2000, lambda: test_cycle())
 

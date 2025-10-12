@@ -1,9 +1,4 @@
-﻿"""
-Chatbot Engine - PRODUCTION BUILD (No Console Output)
-Audio-Reactive Avatar System
-"""
-
-import json
+﻿import json
 import threading
 import time
 from pathlib import Path
@@ -434,16 +429,13 @@ class ChatbotEngine:
         self.initialize()
 
 if __name__ == '__main__':
-    print("Testing Chatbot Engine...")
 
     engine = ChatbotEngine()
     engine.initialize()
     engine.start()
 
-    print("\nSending test message...")
     engine.process_text_input("Hello! Can you introduce yourself?")
 
     time.sleep(5)
 
-    print("\nTest complete!")
     engine.stop()
