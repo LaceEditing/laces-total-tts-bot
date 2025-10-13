@@ -2984,19 +2984,52 @@ TWITCH_OAUTH_TOKEN=
                 threading.Thread(target=load_voices_thread, daemon=True).start()
 
     def refresh_microphone_list(self):
-        """Refresh list of available microphones"""
+        """Refresh list of available microphones (INPUT DEVICES ONLY)"""
         try:
-            import speech_recognition as sr
-            mic_list = sr.Microphone.list_microphone_names()
+            import pyaudio
 
+            print("[App] Refreshing microphone list...")
+
+            # Initialize PyAudio to enumerate devices
+            p = pyaudio.PyAudio()
+            device_count = p.get_device_count()
+
+            print(f"[App] Scanning {device_count} audio devices...")
+
+            # Collect ONLY input devices (microphones)
+            mic_list = []
+
+            for i in range(device_count):
+                try:
+                    info = p.get_device_info_by_index(i)
+                    name = info.get('name', 'Unknown')
+                    max_input = info.get('maxInputChannels', 0)
+                    max_output = info.get('maxOutputChannels', 0)
+
+                    # ONLY add devices that have INPUT channels
+                    if max_input > 0:
+                        mic_list.append(name)
+                        print(f"[App]   ✓ MIC:     {name} (IN:{max_input} OUT:{max_output})")
+                    else:
+                        print(f"[App]   × SPEAKER: {name} (OUT:{max_output}) - SKIPPED")
+
+                except Exception as e:
+                    print(f"[App]   ? Error reading device {i}: {e}")
+
+            p.terminate()
+
+            # Update the dropdown menu
             if mic_list:
                 self.mic_device_menu['values'] = ['Default'] + mic_list
-                print(f"[App] Found {len(mic_list)} microphone(s)")
+                print(f"[App] ✅ Found {len(mic_list)} microphone(s)")
             else:
                 self.mic_device_menu['values'] = ['No microphones found']
+                print("[App] ❌ No input devices detected!")
 
         except Exception as e:
-            print(f"[App] Error refreshing microphones: {e}")
+            print(f"[App] ❌ Error refreshing microphones: {e}")
+            import traceback
+            traceback.print_exc()
             self.mic_device_menu['values'] = ['Error detecting microphones']
 
     def clear_conversation_history(self):
@@ -3419,30 +3452,86 @@ TWITCH_OAUTH_TOKEN=
         """When push-to-talk key is pressed"""
         if not self.is_recording and self.engine.is_running:
             self.is_recording = True
-            self.recording_label.config(text="🔴 RECORDING... (release to send)")
-            threading.Thread(target=self.start_recording, daemon=True).start()
+            self.recording_label.config(text="🔴 LISTENING... (speak now, release to send)")
+            self.add_chat_message("System", "🎤 Recording started - speak now!")
+            # Start recording in background thread
+            threading.Thread(target=self.capture_audio, daemon=True).start()
 
     def on_push_to_talk_release(self, event):
         """When push-to-talk key is released"""
         if self.is_recording:
             self.is_recording = False
-            self.recording_label.config(text="")
+            self.recording_label.config(text="⏳ Processing audio...")
 
-    def start_recording(self):
-        """Start recording audio"""
-        if not self.engine.is_running or not self.is_recording:
-            return
-
-        self.add_chat_message("System", "Listening...")
-
+    def capture_audio(self):
+        """Capture audio and process when done"""
+        import speech_recognition as sr
         import time
-        start_time = time.time()
 
-        while self.is_recording and (time.time() - start_time) < 10:
+        try:
+            recognizer = sr.Recognizer()
+            microphone = sr.Microphone()
+
+            with microphone as source:
+                # Quick ambient noise adjustment
+                recognizer.adjust_for_ambient_noise(source, duration=0.2)
+
+                # Capture audio - this will wait for speech and record it
+                # It blocks until phrase_time_limit is reached or silence detected
+                audio = recognizer.listen(
+                    source,
+                    timeout=1,  # Start listening within 1 second
+                    phrase_time_limit=10  # Max 10 seconds of speech
+                )
+
+            # Audio captured! Now wait a moment for key release if still held
             time.sleep(0.1)
+            self.is_recording = False
 
-        if time.time() - start_time > 0.5:
-            self.engine.process_microphone_input()
+            # Transcribe the captured audio
+            self.add_chat_message("System", "🔄 Transcribing speech...")
+
+            try:
+                text = recognizer.recognize_google(audio)
+
+                if text and text.strip():
+                    self.recording_label.config(text="")
+                    self.add_chat_message("You", text)
+
+                    # Get screen capture if enabled
+                    screen_data = None
+                    if self.config.get('screen_enabled', False) and self.engine.inputs.enabled_inputs.get('screen',
+                                                                                                          False):
+                        self.add_chat_message("System", "📸 Capturing screen...")
+                        screen_data = self.engine.inputs.capture_screen()
+
+                    # Send to AI
+                    self.engine._process_and_respond(text, screen_data)
+
+                else:
+                    self.recording_label.config(text="")
+                    self.add_chat_message("System", "❌ No speech detected")
+
+            except sr.UnknownValueError:
+                self.recording_label.config(text="")
+                self.add_chat_message("System", "❌ Could not understand the audio")
+
+            except sr.RequestError as e:
+                self.recording_label.config(text="")
+                self.add_chat_message("System", f"❌ Google Speech Recognition error: {e}")
+
+        except sr.WaitTimeoutError:
+            self.is_recording = False
+            self.recording_label.config(text="")
+            self.add_chat_message("System", "❌ Timeout - didn't hear any speech")
+
+        except Exception as e:
+            self.is_recording = False
+            self.recording_label.config(text="")
+            self.add_chat_message("System", f"❌ Recording error: {str(e)}")
+            print(f"[App] Recording error: {e}")
+            import traceback
+            traceback.print_exc()
 
     def screenshot_and_respond(self):
         """Take screenshot and get AI response"""
@@ -3469,8 +3558,7 @@ TWITCH_OAUTH_TOKEN=
                         )
                         return
 
-                    # CHANGED: Brief response prompt instead of detailed
-                    prompt = "In 1-2 sentences, briefly tell me what you see in this screenshot."
+                    prompt = "In 1-2 sentences, briefly tell me what you see in this screenshot. DO NOT EXPLAIN IN DETAIL, JUST GIVE A VERY SHORT RESPONSE BASED ON WHAT YOU SEE."
                     self.engine._process_and_respond(prompt, screen_data)
                 else:
                     self.add_chat_message("System", "❌ Failed to capture screenshot")
