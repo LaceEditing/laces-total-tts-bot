@@ -63,10 +63,13 @@ class ChatbotEngine:
             'twitch_channel': '',
             'mic_enabled': True,
             'screen_enabled': False,
+            'hotkey_toggle': 'f4',          # Microphone hotkey
+            'hotkey_stop': 'p',             # Stop recording (legacy)
+            'hotkey_screenshot': 'f5',      # ADD THIS LINE - Screenshot hotkey
             'speaking_image': '',
             'idle_image': '',
-            'avatar_bg_color': '#00FF00',  # ADD THIS LINE
-            'avatar_transparency': False,   # ADD THIS LINE
+            'avatar_bg_color': '#00FF00',
+            'avatar_transparency': False,
             'max_context_tokens': 8000,
             'volume_threshold': 0.02,
             'elevenlabs_stability': 0.5,

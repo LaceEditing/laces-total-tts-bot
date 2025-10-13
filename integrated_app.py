@@ -1410,6 +1410,95 @@ TWITCH_OAUTH_TOKEN=
         )
         refresh_btn.grid(row=1, column=2, padx=5)
 
+        # Hotkey Configuration
+        hotkey_frame = tk.Frame(mic_section, bg=self.colors['bg'])
+        hotkey_frame.grid(row=3, column=0, columnspan=3, sticky='ew', pady=10)
+
+        tk.Label(
+            hotkey_frame,
+            text="Microphone Hotkey:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold
+        ).pack(side='left', padx=5)
+
+        self.mic_hotkey_var = tk.StringVar(value=self.config.get('hotkey_toggle', 'f4'))
+        mic_hotkey_entry = tk.Entry(
+            hotkey_frame,
+            textvariable=self.mic_hotkey_var,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=10,
+            insertbackground=self.colors['fg']
+        )
+        mic_hotkey_entry.pack(side='left', padx=5)
+        mic_hotkey_entry.bind('<FocusOut>', lambda e: self.update_config('hotkey_toggle', self.mic_hotkey_var.get()))
+
+        tk.Label(
+            hotkey_frame,
+            text="(Hold to record, release to send)",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 9, 'italic')
+        ).pack(side='left', padx=5)
+
+        # Screenshot Hotkey Configuration
+        screenshot_hotkey_frame = tk.Frame(mic_section, bg=self.colors['bg'])
+        screenshot_hotkey_frame.grid(row=4, column=0, columnspan=3, sticky='ew', pady=10)
+
+        tk.Label(
+            screenshot_hotkey_frame,
+            text="Screenshot Hotkey:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold
+        ).pack(side='left', padx=5)
+
+        self.screenshot_hotkey_var = tk.StringVar(value=self.config.get('hotkey_screenshot', 'f5'))
+        screenshot_hotkey_entry = tk.Entry(
+            screenshot_hotkey_frame,
+            textvariable=self.screenshot_hotkey_var,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=10,
+            insertbackground=self.colors['fg']
+        )
+        screenshot_hotkey_entry.pack(side='left', padx=5)
+        screenshot_hotkey_entry.bind('<FocusOut>', lambda e: self.update_config('hotkey_screenshot',
+                                                                                self.screenshot_hotkey_var.get()))
+
+        tk.Label(
+            screenshot_hotkey_frame,
+            text="(Press to capture screen and get AI response)",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 9, 'italic')
+        ).pack(side='left', padx=5)
+
+        # Hotkey Tips
+        tips_frame = tk.Frame(mic_section, bg=self.colors['entry_bg'], bd=2, relief='solid')
+        tips_frame.grid(row=5, column=0, columnspan=3, sticky='ew', pady=10, padx=20)
+
+        tips_text = """
+        💡 Hotkey Tips:
+        • Use function keys: f1, f2, f3, etc.
+        • Use letters: a, b, c, etc.
+        • Common choices: f4, f5, f6 (avoid f1/f11/f12 which may conflict)
+        • Changes apply when you restart the chatbot
+        • Make sure hotkeys don't conflict with other programs
+                """
+
+        tk.Label(
+            tips_frame,
+            text=tips_text,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            justify='left'
+        ).pack(padx=10, pady=10)
+
         tk.Label(mic_section, text="Recording Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=self.ui_font).grid(row=2, column=0, sticky='w', pady=5)
@@ -1764,6 +1853,71 @@ TWITCH_OAUTH_TOKEN=
         """Update cooldown label"""
         self.cooldown_label.config(text=f"{value}s")
         self.update_config('twitch_cooldown', value)
+
+    def setup_push_to_talk(self):
+        """Setup push-to-talk and screenshot hotkeys"""
+        try:
+            # Microphone hotkey
+            mic_hotkey = self.config.get('hotkey_toggle', 'f4').lower()
+            keyboard.on_press_key(mic_hotkey, self.on_push_to_talk_press)
+            keyboard.on_release_key(mic_hotkey, self.on_push_to_talk_release)
+            print(f"[App] Microphone hotkey ({mic_hotkey}) activated")
+
+            # Screenshot hotkey
+            screenshot_hotkey = self.config.get('hotkey_screenshot', 'f5').lower()
+            keyboard.on_press_key(screenshot_hotkey, self.on_screenshot_hotkey_press)
+            print(f"[App] Screenshot hotkey ({screenshot_hotkey}) activated")
+
+            self.hotkey_active = True
+
+        except Exception as e:
+            print(f"[App] Hotkey setup failed: {e}")
+
+    def on_screenshot_hotkey_press(self, event):
+        """When screenshot hotkey is pressed"""
+        if self.engine.is_running and not self.is_recording:
+            print("[App] Screenshot hotkey pressed")
+            # Run screenshot in a thread to avoid blocking
+            threading.Thread(target=self.screenshot_and_respond, daemon=True).start()
+
+    def on_push_to_talk_press(self, event):
+        """When push-to-talk key is pressed"""
+        if not self.is_recording and self.engine.is_running:
+            self.is_recording = True
+            self.recording_label.config(text="🔴 RECORDING... (release to send)")
+            threading.Thread(target=self.start_recording, daemon=True).start()
+
+    def on_push_to_talk_release(self, event):
+        """When push-to-talk key is released"""
+        if self.is_recording:
+            self.is_recording = False
+            self.recording_label.config(text="")
+
+    def start_recording(self):
+        """Start recording audio"""
+        if not self.engine.is_running or not self.is_recording:
+            return
+
+        self.add_chat_message("System", "Listening...")
+
+        import time
+        start_time = time.time()
+
+        while self.is_recording and (time.time() - start_time) < 10:
+            time.sleep(0.1)
+
+        if time.time() - start_time > 0.5:
+            self.engine.process_microphone_input()
+
+    def remove_hotkeys(self):
+        """Remove all hotkeys"""
+        if self.hotkey_active:
+            try:
+                keyboard.unhook_all()
+                self.hotkey_active = False
+                print("[App] Hotkeys removed")
+            except:
+                pass
 
     def create_avatar_tab(self, notebook):
         """Avatar tab with audio-reactive controls"""
@@ -2707,9 +2861,11 @@ TWITCH_OAUTH_TOKEN=
         center_frame = tk.Frame(inner, bg=self.colors['accent'])
         center_frame.pack(side='left', padx=40)
 
+        # Update screenshot button to show hotkey
+        screenshot_hotkey = self.config.get('hotkey_screenshot', 'f5').upper()
         self.screenshot_btn = tk.Button(
             center_frame,
-            text="Screenshot & Respond",
+            text=f"📸 Screenshot ({screenshot_hotkey})",  # CHANGED: Added hotkey display
             command=self.screenshot_and_respond,
             bg='#FF6B6B',
             fg='white',
@@ -3313,7 +3469,8 @@ TWITCH_OAUTH_TOKEN=
                         )
                         return
 
-                    prompt = "What do you see in this screenshot? Describe it in detail."
+                    # CHANGED: Brief response prompt instead of detailed
+                    prompt = "In 1-2 sentences, briefly tell me what you see in this screenshot."
                     self.engine._process_and_respond(prompt, screen_data)
                 else:
                     self.add_chat_message("System", "❌ Failed to capture screenshot")
