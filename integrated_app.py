@@ -70,6 +70,22 @@ class IntegratedChatbotApp:
                 'Amy', 'Joanna', 'Salli', 'Kimberly', 'Kendra', 'Joey',
                 'Matthew', 'Geraint', 'Raveena',
             ],
+            'azure': [
+                'en-US-JennyNeural (Female, Friendly)',
+                'en-US-GuyNeural (Male, Conversational)',
+                'en-US-AriaNeural (Female, Cheerful)',
+                'en-US-DavisNeural (Male, Professional)',
+                'en-US-JaneNeural (Female, Calm)',
+                'en-US-JasonNeural (Male, Energetic)',
+                'en-US-SaraNeural (Female, Soft)',
+                'en-US-TonyNeural (Male, Authoritative)',
+                'en-US-NancyNeural (Female, Warm)',
+                'en-US-AmberNeural (Female, Young)',
+                'en-GB-SoniaNeural (British Female)',
+                'en-GB-RyanNeural (British Male)',
+                'en-AU-NatashaNeural (Australian Female)',
+                'en-AU-WilliamNeural (Australian Male)',
+            ],
         }
         self.create_gui()
 
@@ -1112,7 +1128,7 @@ TWITCH_OAUTH_TOKEN=
                  bg=self.colors['bg'], fg=self.colors['fg'],
                  font=self.ui_font_bold).grid(row=0, column=0, sticky='w', pady=5)
 
-        tts_services = ['streamelements', 'elevenlabs']
+        tts_services = ['streamelements', 'elevenlabs', 'azure']
         self.tts_var = tk.StringVar(value=self.config['tts_service'])
         tts_menu = ttk.Combobox(tts_frame, textvariable=self.tts_var,
                                 values=tts_services, state='readonly', width=25)
@@ -1179,6 +1195,16 @@ TWITCH_OAUTH_TOKEN=
         self.elevenlabs_info = tk.Label(
             self.tts_info_frame,
             text="ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 9),
+            wraplength=600,
+            justify='left'
+        )
+
+        self.azure_info = tk.Label(
+            self.tts_info_frame,
+            text="Azure TTS - Microsoft's neural voices. High quality, generous free tier (5M chars/month).",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
@@ -1764,11 +1790,12 @@ TWITCH_OAUTH_TOKEN=
 
     HOW TO USE:
     1. Select your idle and speaking images below
-    2. Adjust sensitivity slider to your preference
-    3. Click "Show Avatar Window" to display the avatar
-    4. In OBS: Window Capture → Select the Avatar window that opens when you start the bot
-    5. Add Chroma Key filter to make background transparent
-    6. Play around with the audio slider to find the most natural looking movement
+    2. Choose your background color (green for OBS chroma key)
+    3. Adjust sensitivity slider to your preference
+    4. Click "Show Avatar Window" to display the avatar
+    5. In OBS: Window Capture → Select the Avatar window
+    6. Add Chroma Key filter to make background transparent
+    7. Play around with the audio slider to find the most natural looking movement
         """
 
         tk.Label(
@@ -1921,7 +1948,166 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 8, 'italic')
         ).pack(pady=5)
 
-        controls_section = self.create_section(scrollable, "Avatar Window Controls", 2)
+        # Background Color Settings Section
+        bg_color_section = self.create_section(scrollable, "🎨 Background Color Settings", 2)
+        bg_color_section.grid_columnconfigure(0, weight=1)
+
+        tk.Label(
+            bg_color_section,
+            text="Choose the background color for the avatar window.\n"
+                 "Use green (#00FF00) for OBS chroma key removal.",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            justify='left'
+        ).pack(pady=(0, 10))
+
+        color_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
+        color_frame.pack(fill='x', pady=10)
+
+        tk.Label(
+            color_frame,
+            text="Background Color:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold,
+            width=18,
+            anchor='w'
+        ).pack(side='left', padx=5)
+
+        # Color preview box
+        self.avatar_bg_color_preview = tk.Frame(
+            color_frame,
+            bg=self.config.get('avatar_bg_color', '#00FF00'),
+            width=50,
+            height=30,
+            relief='solid',
+            borderwidth=2
+        )
+        self.avatar_bg_color_preview.pack(side='left', padx=5)
+        self.avatar_bg_color_preview.pack_propagate(False)
+
+        # Color entry
+        self.avatar_bg_color_var = tk.StringVar(value=self.config.get('avatar_bg_color', '#00FF00'))
+        color_entry = tk.Entry(
+            color_frame,
+            textvariable=self.avatar_bg_color_var,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=15,
+            insertbackground=self.colors['fg']
+        )
+        color_entry.pack(side='left', padx=5)
+        color_entry.bind('<KeyRelease>', self.on_avatar_color_change)
+
+        tk.Button(
+            color_frame,
+            text="Pick Color",
+            command=self.pick_avatar_color,
+            bg=self.colors['button'],
+            fg='white',
+            font=self.ui_font_bold,
+            relief='raised',
+            borderwidth=2,
+            cursor='hand2',
+            padx=15,
+            pady=5
+        ).pack(side='left', padx=5)
+
+        # Preset colors
+        preset_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
+        preset_frame.pack(fill='x', pady=10)
+
+        tk.Label(
+            preset_frame,
+            text="Preset Colors:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            width=18,
+            anchor='w'
+        ).pack(side='left', padx=5)
+
+        presets = [
+            ("#00FF00", "Green (Chroma)"),
+            ("#FF00FF", "Magenta"),
+            ("#0000FF", "Blue"),
+            ("#000000", "Black"),
+            ("#FFFFFF", "White"),
+        ]
+
+        for color, name in presets:
+            btn = tk.Button(
+                preset_frame,
+                text=name,
+                command=lambda c=color: self.set_avatar_color(c),
+                bg=color,
+                fg='white' if color in ['#00FF00', '#0000FF', '#000000', '#FF00FF'] else 'black',
+                font=(self.ui_font[0], 8),
+                relief='raised',
+                borderwidth=2,
+                cursor='hand2',
+                width=12
+            )
+            btn.pack(side='left', padx=2)
+
+        # Transparency toggle
+        transparency_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
+        transparency_frame.pack(fill='x', pady=10)
+
+        self.avatar_transparency_var = tk.BooleanVar(value=self.config.get('avatar_transparency', False))
+        transparency_check = tk.Checkbutton(
+            transparency_frame,
+            text="Enable Transparency (Windows only - makes background color transparent)",
+            variable=self.avatar_transparency_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font,
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
+            command=lambda: self.update_config('avatar_transparency', self.avatar_transparency_var.get())
+        )
+        transparency_check.pack(anchor='w', padx=5)
+
+        tk.Label(
+            transparency_frame,
+            text="Note: Transparency uses the background color. Set to green for best OBS chroma key results.",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 8, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).pack(anchor='w', padx=5, pady=5)
+
+        # Apply button
+        apply_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
+        apply_frame.pack(pady=15)
+
+        tk.Button(
+            apply_frame,
+            text="🎨 Apply Color & Reload Avatar",
+            command=self.apply_avatar_color,
+            bg='#9370DB',
+            fg='white',
+            font=self.ui_font_bold,
+            relief='raised',
+            borderwidth=3,
+            cursor='hand2',
+            padx=20,
+            pady=10
+        ).pack()
+
+        tk.Label(
+            apply_frame,
+            text="Click after changing color to update the avatar window",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 8, 'italic')
+        ).pack(pady=5)
+
+        controls_section = self.create_section(scrollable, "Avatar Window Controls", 3)
         controls_section.grid_columnconfigure(0, weight=1)
 
         control_frame = tk.Frame(controls_section, bg=self.colors['bg'])
@@ -1960,7 +2146,7 @@ TWITCH_OAUTH_TOKEN=
             justify='center'
         ).pack(pady=10)
 
-        images_section = self.create_section(scrollable, "Select Avatar Images", 3)
+        images_section = self.create_section(scrollable, "Select Avatar Images", 4)
         images_section.grid_columnconfigure(0, weight=1)
 
         speaking_frame = tk.Frame(images_section, bg=self.colors['bg'])
@@ -2067,7 +2253,7 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 8, 'italic')
         ).pack(pady=5)
 
-        preview_section = self.create_section(scrollable, "Preview", 4)
+        preview_section = self.create_section(scrollable, "Preview", 5)
         preview_section.grid_columnconfigure(0, weight=1)
 
         preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
@@ -2090,6 +2276,122 @@ TWITCH_OAUTH_TOKEN=
 
         self.load_existing_avatar_previews()
         self.start_audio_meter_updates()
+
+    def choose_avatar_color(self):
+        """Open color picker for avatar background"""
+        from tkinter import colorchooser
+
+        current_color = self.config.get('avatar_bg_color', '#00FF00')
+        color = colorchooser.askcolor(
+            color=current_color,
+            title="Choose Avatar Background Color"
+        )
+
+        if color and color[1]:
+            self.set_avatar_color(color[1].upper())
+
+    def set_avatar_color(self, hex_color):
+        """Set avatar background color"""
+        # Update config
+        self.update_config('avatar_bg_color', hex_color)
+
+        # Update preview box
+        self.color_preview.config(bg=hex_color)
+        self.color_value_label.config(text=hex_color)
+
+        # Update avatar window if it exists and is visible
+        if self.engine.avatar_window:
+            try:
+                self.engine.avatar_window.set_background_color(hex_color)
+                print(f"[App] Updated avatar background to {hex_color}")
+            except Exception as e:
+                print(f"[App] Error updating avatar color: {e}")
+
+        # Save to config file
+        self.save_all_settings()
+
+    def on_avatar_color_change(self, event=None):
+        """Update color preview when user types"""
+        color = self.avatar_bg_color_var.get()
+        try:
+            # Validate hex color
+            if color.startswith('#') and len(color) == 7:
+                # Test if valid hex
+                int(color[1:], 16)
+                self.avatar_bg_color_preview.config(bg=color)
+                self.update_config('avatar_bg_color', color)
+        except:
+            pass  # Invalid color, don't update
+
+    def set_avatar_color(self, color):
+        """Set avatar background color from preset"""
+        self.avatar_bg_color_var.set(color)
+        self.avatar_bg_color_preview.config(bg=color)
+        self.update_config('avatar_bg_color', color)
+
+    def pick_avatar_color(self):
+        """Open color picker dialog"""
+        from tkinter import colorchooser
+
+        current_color = self.avatar_bg_color_var.get()
+        color = colorchooser.askcolor(
+            color=current_color,
+            title="Choose Avatar Background Color"
+        )
+
+        if color[1]:  # color[1] is the hex string
+            self.set_avatar_color(color[1])
+
+    def apply_avatar_color(self):
+        """Apply the new background color to the avatar window"""
+        if not self.engine.avatar_window:
+            messagebox.showinfo(
+                "No Avatar Window",
+                "The avatar window is not open yet.\n\n"
+                "Open the avatar window first, then apply the color."
+            )
+            return
+
+        color = self.avatar_bg_color_var.get()
+        transparency = self.avatar_transparency_var.get()
+
+        print(f"[App] Applying avatar color: {color}, transparency: {transparency}")
+
+        # Update window background color
+        try:
+            self.engine.avatar_window.window.configure(bg=color)
+            self.engine.avatar_window.image_label.config(bg=color)
+
+            # Apply transparency if enabled
+            if transparency:
+                try:
+                    self.engine.avatar_window.window.attributes('-transparentcolor', color)
+                    print(f"[App] Transparency enabled with color {color}")
+                except Exception as e:
+                    print(f"[App] Transparency not supported: {e}")
+                    messagebox.showwarning(
+                        "Transparency Not Supported",
+                        "Transparency is not supported on your system.\n\n"
+                        "This feature only works on Windows."
+                    )
+            else:
+                # Disable transparency
+                try:
+                    self.engine.avatar_window.window.attributes('-transparentcolor', '')
+                except:
+                    pass
+
+            messagebox.showinfo(
+                "Color Applied",
+                f"✅ Background color changed to {color}\n\n"
+                f"Transparency: {'Enabled' if transparency else 'Disabled'}"
+            )
+
+        except Exception as e:
+            messagebox.showerror(
+                "Error",
+                f"Failed to apply color:\n{e}"
+            )
 
     def on_threshold_change(self, value):
         """Called when threshold slider changes"""
@@ -2199,44 +2501,81 @@ TWITCH_OAUTH_TOKEN=
         threading.Thread(target=test_thread, daemon=True).start()
 
     def toggle_avatar_window(self):
-        """Toggle the avatar window visibility"""
+        """Toggle the avatar window visibility with better error handling"""
+        print("[App] Toggle avatar window called")
+
         if not self.engine.avatar_window:
+            # Need to create window first
             idle = self.config.get('idle_image', '')
             speaking = self.config.get('speaking_image', '')
 
+            print(f"[App] Idle: {idle}")
+            print(f"[App] Speaking: {speaking}")
+
+            # Validate image configuration
             if not idle or not speaking:
                 messagebox.showwarning(
                     "Images Not Set",
-                    "Please select both idle and speaking images first!"
+                    "Please select both idle and speaking images first!\n\n"
+                    "Use the Browse buttons in the Avatar tab to select your images."
                 )
                 return
 
-            if not Path(idle).exists() or not Path(speaking).exists():
+            if not Path(idle).exists():
                 messagebox.showerror(
-                    "Images Not Found",
-                    "One or more image files could not be found.\nPlease check the file paths."
+                    "Image Not Found",
+                    f"Idle image file not found:\n{idle}\n\n"
+                    f"Please check the file path and try again."
                 )
                 return
 
-            self.engine._load_images()
-            if self.engine.avatar_window:
-                self.engine.avatar_window.show()
-                self.avatar_window_btn.config(text="Hide Avatar Window")
-                self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
+            if not Path(speaking).exists():
+                messagebox.showerror(
+                    "Image Not Found",
+                    f"Speaking image file not found:\n{speaking}\n\n"
+                    f"Please check the file path and try again."
+                )
+                return
+
+            # Try to create avatar window
+            print("[App] Creating avatar window...")
+            success = self.engine._load_images()
+
+            if not success or not self.engine.avatar_window:
+                messagebox.showerror(
+                    "Failed to Load Avatar",
+                    "Could not create avatar window.\n\n"
+                    "Check the console for error details.\n"
+                    "Make sure your image files are valid PNG/JPG files."
+                )
+                return
+
+            # Show the window
+            self.engine.avatar_window.show()
+            self.avatar_window_btn.config(text="Hide Avatar Window")
+            self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
+            print("[App] ✅ Avatar window shown")
+
         else:
+            # Toggle existing window
             is_visible = self.engine.toggle_avatar_window()
             if is_visible:
                 self.avatar_window_btn.config(text="Hide Avatar Window")
                 self.avatar_status_label.config(text="🟢 Window Visible", fg='#4CAF50')
+                print("[App] Avatar window shown")
             else:
                 self.avatar_window_btn.config(text="Show Avatar Window")
                 self.avatar_status_label.config(text="⚫ Window Hidden", fg=self.colors['accent'])
+                print("[App] Avatar window hidden")
 
     def reload_avatar_images(self):
-        """Reload avatar images in the window"""
+        """Reload avatar images with better error handling"""
+        print("[App] Reloading avatar images...")
+
         idle = self.config.get('idle_image', '')
         speaking = self.config.get('speaking_image', '')
 
+        # Validate
         if not idle or not speaking:
             messagebox.showwarning(
                 "Images Not Set",
@@ -2244,15 +2583,97 @@ TWITCH_OAUTH_TOKEN=
             )
             return
 
-        if not Path(idle).exists() or not Path(speaking).exists():
+        if not Path(idle).exists():
             messagebox.showerror(
-                "Images Not Found",
-                "One or more image files could not be found."
+                "Image Not Found",
+                f"Idle image file not found:\n{idle}"
             )
             return
 
-        self.engine._load_images()
-        messagebox.showinfo("Success", "Avatar images reloaded successfully!")
+        if not Path(speaking).exists():
+            messagebox.showerror(
+                "Image Not Found",
+                f"Speaking image file not found:\n{speaking}"
+            )
+            return
+
+        # Reload
+        success = self.engine._load_images()
+
+        if success:
+            messagebox.showinfo(
+                "Success",
+                "✅ Avatar images reloaded successfully!\n\n"
+                "The avatar window will now use the new images."
+            )
+            print("[App] ✅ Images reloaded")
+        else:
+            messagebox.showerror(
+                "Failed to Reload",
+                "Could not reload avatar images.\n\n"
+                "Check the console for error details."
+            )
+            print("[App] ❌ Failed to reload images")
+
+    def browse_image(self, image_type):
+        """Browse for avatar image with better error handling"""
+        filename = filedialog.askopenfilename(
+            title=f"Select {image_type} image",
+            filetypes=[
+                ("PNG files", "*.png"),
+                ("JPEG files", "*.jpg *.jpeg"),
+                ("All image files", "*.png *.jpg *.jpeg *.gif *.bmp"),
+                ("All files", "*.*")
+            ]
+        )
+
+        if filename:
+            print(f"[App] Selected {image_type} image: {filename}")
+
+            # Validate the file can be opened
+            try:
+                from PIL import Image
+                test_img = Image.open(filename)
+                test_img.close()
+                print(f"[App] ✅ Image file is valid")
+            except Exception as e:
+                messagebox.showerror(
+                    "Invalid Image",
+                    f"Could not open the selected image file:\n{filename}\n\n"
+                    f"Error: {e}\n\n"
+                    f"Please select a valid image file."
+                )
+                return
+
+            # Update config
+            config_key = f'{image_type}_image'
+            self.update_config(config_key, filename)
+
+            # Update UI display
+            display_path = filename
+            if len(filename) > 60:
+                path_parts = filename.split('/')
+                if len(path_parts) > 1:
+                    display_path = f".../{path_parts[-2]}/{path_parts[-1]}"
+                else:
+                    display_path = f"...{filename[-57:]}"
+
+            if image_type == 'speaking':
+                self.speaking_path_label.config(text=display_path, fg=self.colors['fg'])
+            else:
+                self.idle_path_label.config(text=display_path, fg=self.colors['fg'])
+
+            # Update preview
+            self.update_avatar_preview(filename)
+
+            # Auto-reload in avatar window if it exists
+            if self.engine.avatar_window:
+                print(f"[App] Auto-reloading {image_type} image in avatar window...")
+                success = self.engine._load_images()
+                if success:
+                    print(f"[App] ✅ Auto-reload successful")
+                else:
+                    print(f"[App] ⚠️ Auto-reload failed")
 
     def create_control_panel(self, parent):
         """Create bottom control panel"""
@@ -2452,9 +2873,6 @@ TWITCH_OAUTH_TOKEN=
                 service = self.tts_var.get()
                 voice = self.voice_var.get()
 
-                if '(' in voice and ')' in voice:
-                    voice = voice.split('(')[1].split(')')[0]
-
                 elevenlabs_settings = None
                 if service == 'elevenlabs':
                     elevenlabs_settings = {
@@ -2466,7 +2884,18 @@ TWITCH_OAUTH_TOKEN=
 
                 tts = TTSManager(service=service, voice=voice, elevenlabs_settings=elevenlabs_settings)
 
-                test_message = f"Hello! This is a test of the {service} voice. Do you like me? Am I what you wanted?"
+                # Connect audio callbacks to the avatar/meter system
+                tts.set_volume_threshold(self.config.get('volume_threshold', 0.02))
+
+                if self.engine and hasattr(self.engine, '_on_audio_start'):
+                    tts.set_audio_callbacks(
+                        on_start=self.engine._on_audio_start,
+                        on_active=self.engine._on_audio_active,
+                        on_silent=self.engine._on_audio_silent,
+                        on_end=self.engine._on_audio_end
+                    )
+
+                test_message = f"Hello! This is a test of the {service} voice. Do you like me senpai? Am I what you want?"
 
                 self.test_voice_label.config(
                     text=f"Playing test message...",
@@ -2629,6 +3058,8 @@ TWITCH_OAUTH_TOKEN=
                 self.se_info.pack(fill='x', pady=5)
             elif service == 'elevenlabs':
                 self.elevenlabs_info.pack(fill='x', pady=5)
+            elif service == 'azure':
+                self.azure_info.pack(fill='x', pady=5)
 
         if service == 'elevenlabs':
             if not voices or len(voices) == 0:
@@ -2714,36 +3145,6 @@ TWITCH_OAUTH_TOKEN=
         self.update_config('tts_service', self.tts_var.get())
         self.update_voice_dropdown()
         self.reinitialize_tts()
-
-    def browse_image(self, image_type):
-        """Browse for avatar image"""
-        filename = filedialog.askopenfilename(
-            title=f"Select {image_type} image",
-            filetypes=[("PNG files", "*.png"), ("All image files", "*.png *.jpg *.jpeg"), ("All files", "*.*")]
-        )
-
-        if filename:
-            config_key = f'{image_type}_image'
-            self.update_config(config_key, filename)
-
-            display_path = filename
-            if len(filename) > 60:
-                path_parts = filename.split('/')
-                if len(path_parts) > 1:
-                    display_path = f".../{path_parts[-2]}/{path_parts[-1]}"
-                else:
-                    display_path = f"...{filename[-57:]}"
-
-            if image_type == 'speaking':
-                self.speaking_path_label.config(text=display_path, fg=self.colors['fg'])
-            else:
-                self.idle_path_label.config(text=display_path, fg=self.colors['fg'])
-
-            self.update_avatar_preview(filename)
-
-            if self.engine.avatar_window:
-                self.engine._load_images()
-                print(f"[App] Auto-reloaded {image_type} image in avatar window")
 
     def update_avatar_preview(self, filename):
         """Update the avatar preview with the selected image"""

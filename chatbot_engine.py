@@ -65,6 +65,8 @@ class ChatbotEngine:
             'screen_enabled': False,
             'speaking_image': '',
             'idle_image': '',
+            'avatar_bg_color': '#00FF00',  # ADD THIS LINE
+            'avatar_transparency': False,   # ADD THIS LINE
             'max_context_tokens': 8000,
             'volume_threshold': 0.02,
             'elevenlabs_stability': 0.5,
@@ -148,24 +150,59 @@ class ChatbotEngine:
         self._load_images()
 
     def _load_images(self):
-        """Initialize avatar window"""
+        """Initialize avatar window with better error handling"""
         try:
             idle_path = self.config.get('idle_image', '')
             speaking_path = self.config.get('speaking_image', '')
+            bg_color = self.config.get('avatar_bg_color', '#00FF00')
+            transparency = self.config.get('avatar_transparency', False)
 
-            if idle_path and speaking_path and Path(idle_path).exists() and Path(speaking_path).exists():
-                if self.avatar_window is None:
-                    self.avatar_window = AvatarWindow(
-                        idle_image_path=idle_path,
-                        speaking_image_path=speaking_path,
-                        bg_color='#00FF00',
-                        always_on_top=False
-                    )
+            print(f"[Engine] Loading avatar images...")
+            print(f"[Engine] Idle path: {idle_path}")
+            print(f"[Engine] Speaking path: {speaking_path}")
+            print(f"[Engine] Background color: {bg_color}")
+            print(f"[Engine] Transparency: {transparency}")
+
+            # Validate paths
+            if not idle_path or not speaking_path:
+                print("[Engine] ERROR: Image paths not configured")
+                return False
+
+            if not Path(idle_path).exists():
+                print(f"[Engine] ERROR: Idle image not found: {idle_path}")
+                return False
+
+            if not Path(speaking_path).exists():
+                print(f"[Engine] ERROR: Speaking image not found: {speaking_path}")
+                return False
+
+            # Create or reload avatar window
+            if self.avatar_window is None:
+                print("[Engine] Creating new avatar window...")
+                self.avatar_window = AvatarWindow(
+                    idle_image_path=idle_path,
+                    speaking_image_path=speaking_path,
+                    bg_color=bg_color,
+                    transparent=transparency,
+                    always_on_top=False
+                )
+                print("[Engine] ✅ Avatar window created")
+            else:
+                print("[Engine] Reloading images in existing window...")
+                success = self.avatar_window.load_images(idle_path, speaking_path)
+                if success:
+                    print("[Engine] ✅ Images reloaded")
                 else:
-                    self.avatar_window.load_images(idle_path, speaking_path)
+                    print("[Engine] ❌ Failed to reload images")
+                    return False
 
-        except Exception:
-            pass
+            return True
+
+        except Exception as e:
+            print(f"[Engine] ERROR in _load_images: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     def start(self):
         """Start the chatbot"""

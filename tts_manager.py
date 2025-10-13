@@ -1,5 +1,5 @@
 ﻿"""
-TTS Manager - StreamElements & ElevenLabs Only
+TTS Manager - StreamElements, ElevenLabs, and Azure TTS
 """
 
 import os
@@ -66,7 +66,7 @@ except Exception:
 
 class TTSManager:
     def __init__(self, service='elevenlabs', voice='default', elevenlabs_settings=None):
-        """Initialize TTS manager - StreamElements & ElevenLabs only"""
+        """Initialize TTS manager - StreamElements, ElevenLabs, and Azure"""
         self.service = service
         self.voice = voice
         self.audio_folder = Path('audio_cache')
@@ -118,6 +118,33 @@ class TTSManager:
             if api_key:
                 self.elevenlabs_client = ElevenLabs(api_key=api_key)
 
+        # Initialize Azure Speech client
+        if service == 'azure':
+            self.azure_speech_config = None
+            self.init_azure_client()
+
+    def init_azure_client(self):
+        """Initialize Azure Speech SDK"""
+        try:
+            import azure.cognitiveservices.speech as speechsdk
+
+            api_key = os.getenv('AZURE_TTS_KEY')
+            region = os.getenv('AZURE_TTS_REGION', 'eastus')
+
+            if api_key and api_key != 'your-azure-key-here':
+                self.azure_speech_config = speechsdk.SpeechConfig(
+                    subscription=api_key,
+                    region=region
+                )
+                print(f"[TTS] Azure Speech initialized with region: {region}")
+            else:
+                print("[TTS] Azure TTS key not configured")
+
+        except ImportError:
+            print("[TTS] Azure Speech SDK not installed. Run: pip install azure-cognitiveservices-speech")
+        except Exception as e:
+            print(f"[TTS] Error initializing Azure: {e}")
+
     def set_volume_threshold(self, threshold):
         """Set the volume threshold for speech detection (0.0-1.0)"""
         self.volume_threshold = max(0.0, min(1.0, threshold))
@@ -133,6 +160,8 @@ class TTSManager:
                 audio_file = self._elevenlabs_tts(text)
             elif self.service == 'streamelements':
                 audio_file = self._streamelements_tts(text)
+            elif self.service == 'azure':
+                audio_file = self._azure_tts(text)
             else:
                 return
 
@@ -150,6 +179,74 @@ class TTSManager:
             print(f"[TTS] Error in speak: {e}")
             if callback_on_end:
                 callback_on_end()
+
+    def _azure_tts(self, text):
+        """Generate speech using Azure Neural TTS"""
+        try:
+            import azure.cognitiveservices.speech as speechsdk
+
+            if not self.azure_speech_config:
+                print("[TTS] Azure not initialized")
+                return None
+
+            # Extract voice name - CRITICAL FIX
+            # Input format: "en-US-JennyNeural (Female, Friendly)"
+            # We need: "en-US-JennyNeural"
+            voice_name = self.voice
+
+            print(f"[TTS] Azure raw voice input: {voice_name}")
+
+            # Remove everything after and including the first "("
+            if '(' in voice_name:
+                voice_name = voice_name.split('(')[0].strip()
+                print(f"[TTS] Azure extracted voice name: {voice_name}")
+
+            # If voice is "default" or empty, use a default neural voice
+            if voice_name == 'default' or not voice_name:
+                voice_name = 'en-US-JennyNeural'
+                print(f"[TTS] Azure using default voice: {voice_name}")
+
+            # Set the voice
+            self.azure_speech_config.speech_synthesis_voice_name = voice_name
+
+            # Set output to WAV file
+            timestamp = str(int(time.time() * 1000))
+            audio_file = self.audio_folder / f'azure_{timestamp}.wav'
+
+            audio_config = speechsdk.audio.AudioOutputConfig(filename=str(audio_file))
+
+            # Create synthesizer
+            synthesizer = speechsdk.SpeechSynthesizer(
+                speech_config=self.azure_speech_config,
+                audio_config=audio_config
+            )
+
+            # Synthesize
+            print(f"[TTS] Azure synthesizing with voice: {voice_name}")
+            result = synthesizer.speak_text_async(text).get()
+
+            # Check result
+            if result.reason == speechsdk.ResultReason.SynthesizingAudioCompleted:
+                print(f"[TTS] ✅ Azure synthesis complete: {audio_file}")
+                return audio_file
+            elif result.reason == speechsdk.ResultReason.Canceled:
+                cancellation = result.cancellation_details
+                print(f"[TTS] ❌ Azure synthesis canceled: {cancellation.reason}")
+                if cancellation.reason == speechsdk.CancellationReason.Error:
+                    print(f"[TTS] Error details: {cancellation.error_details}")
+                return None
+            else:
+                print(f"[TTS] ❌ Azure synthesis failed: {result.reason}")
+                return None
+
+        except ImportError:
+            print("[TTS] ❌ Azure Speech SDK not installed")
+            return None
+        except Exception as e:
+            print(f"[TTS] ❌ Azure TTS error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def _analyze_audio_file(self, audio_file):
         """Analyze audio file to extract volume envelope"""
@@ -371,11 +468,8 @@ class TTSManager:
 
 
 if __name__ == '__main__':
-    # Test StreamElements
-    tts = TTSManager(service='streamelements', voice='Brian')
-    tts.speak("Testing StreamElements TTS. This is free and works great!")
-    time.sleep(3)
-
-    # Test ElevenLabs (if you have an API key)
-    # tts = TTSManager(service='elevenlabs', voice='rachel')
-    # tts.speak("Testing ElevenLabs premium voice quality!")
+    # Test Azure TTS
+    print("Testing Azure TTS...")
+    tts = TTSManager(service='azure', voice='jenny')
+    tts.speak("Testing Azure Neural Text to Speech. This is a high quality neural voice!")
+    time.sleep(5)
