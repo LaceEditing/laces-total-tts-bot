@@ -1,15 +1,28 @@
 ﻿import os
 from openai import OpenAI
+from groq import Groq
 import tiktoken
 
 
 class LLMManager:
     def __init__(self, model='gpt-4o', system_prompt='You are a helpful assistant.', max_tokens=8000):
-        """Initialize LLM manager with specified model"""
-        self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        """Initialize LLM manager with specified model (OpenAI or Groq)"""
         self.model = model
         self.chat_history = []
         self.max_tokens = max_tokens
+
+        # Determine if using Groq or OpenAI
+        self.is_groq = (model.startswith('llama') or
+                        model.startswith('mixtral') or
+                        model.startswith('gemma') or
+                        model.startswith('qwen') or
+                        model.startswith('moonshotai') or
+                        model.startswith('openai/'))
+
+        if self.is_groq:
+            self.client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+        else:
+            self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
         if system_prompt:
             self.chat_history.append({
@@ -19,6 +32,19 @@ class LLMManager:
 
     def count_tokens(self, messages):
         """Count tokens in message list"""
+        if self.is_groq:
+            # Rough estimate for Groq models
+            total = 0
+            for msg in messages:
+                content = msg.get('content', '')
+                if isinstance(content, str):
+                    total += len(content.split()) * 1.3  # Rough token estimate
+                elif isinstance(content, list):
+                    for item in content:
+                        if item.get("type") == "text":
+                            total += len(item.get("text", "").split()) * 1.3
+            return int(total)
+
         try:
             encoding = tiktoken.encoding_for_model(self.model)
             num_tokens = 0
@@ -51,11 +77,14 @@ class LLMManager:
             else:
                 break
 
-    def chat(self, user_message, temperature=0.7, max_response_tokens=500):
-        """Send message and get response"""
-        if not user_message.strip():
-            return ""
+    def chat(self, user_message, temperature=0.7, max_response_tokens=150, image_path=None):
+        """Send a message and get response"""
 
+        # Handle vision for OpenAI only
+        if image_path and not self.is_groq:
+            return self.chat_with_vision(user_message, image_path, temperature, max_response_tokens)
+
+        # Regular text chat
         self.chat_history.append({
             "role": "user",
             "content": user_message
@@ -81,36 +110,31 @@ class LLMManager:
             return assistant_message
 
         except Exception as e:
-            error_msg = f"Error getting LLM response: {e}"
+            error_msg = f"Error getting response: {e}"
             return error_msg
 
-    def chat_with_vision(self, user_message, image_url=None, temperature=0.7, max_response_tokens=500):
-        """Send message with optional image for vision models"""
-        if not user_message.strip():
-            return ""
+    def chat_with_vision(self, user_message, image_path, temperature=0.7, max_response_tokens=150):
+        """Send message with image (OpenAI only)"""
+        if self.is_groq:
+            return "Vision not supported with Groq models. Use OpenAI GPT-4o for vision."
 
-        vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
-        supports_vision = self.model in vision_models
+        import base64
 
-        if not supports_vision and image_url:
-            return self.chat(user_message, temperature, max_response_tokens)
+        with open(image_path, "rb") as image_file:
+            base64_image = base64.b64encode(image_file.read()).decode('utf-8')
 
-        if image_url and supports_vision:
-            content = [
-                {
-                    "type": "text",
-                    "text": user_message
-                },
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": image_url,
-                        "detail": "high"
-                    }
+        content = [
+            {
+                "type": "text",
+                "text": user_message
+            },
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{base64_image}"
                 }
-            ]
-        else:
-            content = user_message
+            }
+        ]
 
         self.chat_history.append({
             "role": "user",
@@ -152,6 +176,12 @@ class LLMManager:
     def set_model(self, model):
         """Change the LLM model"""
         self.model = model
+        self.is_groq = model.startswith('llama') or model.startswith('mixtral') or model.startswith('gemma')
+
+        if self.is_groq:
+            self.client = Groq(api_key=os.getenv('GROQ_API_KEY'))
+        else:
+            self.client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
     def set_system_prompt(self, prompt):
         """Update system prompt"""
@@ -175,6 +205,8 @@ class LLMManager:
 if __name__ == '__main__':
     # Test the LLM manager
     llm = LLMManager(
-        model='gpt-4o',
+        model='llama-3.1-8b-instant',
         system_prompt='You are a friendly AI named Bob.'
     )
+
+    print(llm.chat("Hello! How are you?"))

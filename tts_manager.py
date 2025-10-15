@@ -149,10 +149,22 @@ class TTSManager:
         """Set the volume threshold for speech detection (0.0-1.0)"""
         self.volume_threshold = max(0.0, min(1.0, threshold))
 
+    def _clean_text_for_tts(self, text):
+        """Remove parentheses and their contents from text before TTS"""
+        import re
+        # Remove anything in parentheses (including the parentheses)
+        text = re.sub(r'\([^)]*\)', '', text)
+        # Clean up any double spaces left behind
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
+
     def speak(self, text, callback_on_start=None, callback_on_end=None):
         """Convert text to speech and play with audio-reactive monitoring"""
         if not text.strip():
             return
+
+        # Clean text: remove content in parentheses
+        text = self._clean_text_for_tts(text)
 
         audio_file = None
         try:

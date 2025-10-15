@@ -11,6 +11,7 @@ from chatbot_engine import ChatbotEngine
 from PIL import Image, ImageTk
 from dotenv import load_dotenv, set_key
 
+VERSION_NUMBER = "1.2.0"
 
 def get_resource_path(relative_path):
     """Get path that works in both script and PyInstaller exe"""
@@ -23,7 +24,7 @@ def get_resource_path(relative_path):
 class IntegratedChatbotApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Hey besties let's commmune with robots")
+        self.root.title(f"Hey besties let's commmune with robots (v{VERSION_NUMBER})")
         self.root.geometry("900x900")
         self.root.minsize(750, 800)
 
@@ -54,6 +55,8 @@ class IntegratedChatbotApp:
         self.root.configure(bg=self.colors['bg'])
 
         self.set_window_icon()
+
+        self.root.after(1, self.set_title_bar_color)
 
         self.engine = ChatbotEngine()
         self.engine.on_volume_update = lambda vol: self.update_audio_meter(vol) if hasattr(self,
@@ -199,6 +202,48 @@ class IntegratedChatbotApp:
 
         except Exception as e:
             print(f"[App] Could not set taskbar icon: {e}")
+
+    # ADD THIS METHOD TO THE IntegratedChatbotApp CLASS IN integrated_app.py
+
+    def set_title_bar_color(self):
+        """Set Windows title bar color to lavender"""
+        try:
+            import ctypes
+
+            # Get the window handle
+            hwnd = ctypes.windll.user32.GetParent(self.root.winfo_id())
+
+            # Lavender color in BGR format (Windows uses BGR, not RGB)
+            # #E6E6FA in RGB = (230, 230, 250)
+            # In BGR = (250, 230, 230) = 0x00FAE6E6
+            lavender_bgr = 0x00FAE6E6
+
+            # Windows 11 style (DWMWA_CAPTION_COLOR = 35)
+            DWMWA_CAPTION_COLOR = 35
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_CAPTION_COLOR,
+                ctypes.byref(ctypes.c_int(lavender_bgr)),
+                ctypes.sizeof(ctypes.c_int)
+            )
+
+            # Also set text color to dark purple for visibility
+            # #4B0082 in RGB = (75, 0, 130)
+            # In BGR = (130, 0, 75) = 0x0082004B
+            DWMWA_TEXT_COLOR = 36
+            text_color_bgr = 0x0082004B
+            ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                DWMWA_TEXT_COLOR,
+                ctypes.byref(ctypes.c_int(text_color_bgr)),
+                ctypes.sizeof(ctypes.c_int)
+            )
+
+            print("[App] ✅ Title bar color set to lavender")
+
+        except Exception as e:
+            print(f"[App] Could not set title bar color: {e}")
+            print("[App] This feature requires Windows 11 or Windows 10 with latest updates")
 
     def create_default_env_file(self):
         """Create a default .env file if it doesn't exist"""
@@ -423,7 +468,7 @@ TWITCH_OAUTH_TOKEN=
 
         scrollable = self.create_scrollable_frame(tab)
 
-        # Add centered wrapper with  padding
+        # Add centered wrapper with padding
         wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
         wrapper.pack(fill='both', expand=True, padx=(835, 0), pady=20)
 
@@ -434,6 +479,7 @@ TWITCH_OAUTH_TOKEN=
         self.key_show_states = {}
         self.key_entries = {}
 
+        # OpenAI API Key
         self.create_api_key_row(
             keys_section,
             row=0,
@@ -444,9 +490,21 @@ TWITCH_OAUTH_TOKEN=
             description="Required for all GPT models"
         )
 
+        # Groq API Key
         self.create_api_key_row(
             keys_section,
             row=1,
+            label="Open Source API Key:",
+            key_name="GROQ_API_KEY",
+            required=False,
+            link="https://console.groq.com/keys",
+            description="Optional - for fast & free models"
+        )
+
+        # ElevenLabs API Key
+        self.create_api_key_row(
+            keys_section,
+            row=2,
             label="ElevenLabs API Key:",
             key_name="ELEVENLABS_API_KEY",
             required=False,
@@ -454,9 +512,10 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - for premium TTS voices"
         )
 
+        # Azure TTS Key
         self.create_api_key_row(
             keys_section,
-            row=2,
+            row=3,
             label="Azure TTS Key:",
             key_name="AZURE_TTS_KEY",
             required=False,
@@ -464,8 +523,9 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - for Azure neural voices"
         )
 
+        # Azure Region (special case)
         azure_region_frame = tk.Frame(keys_section, bg=self.colors['bg'])
-        azure_region_frame.grid(row=3, column=0, columnspan=4, sticky='ew', pady=5)
+        azure_region_frame.grid(row=4, column=0, columnspan=4, sticky='ew', pady=5)
 
         tk.Label(
             azure_region_frame,
@@ -486,9 +546,10 @@ TWITCH_OAUTH_TOKEN=
         self.azure_region_entry.pack(side='left', padx=5)
         self.azure_region_entry.insert(0, self.get_api_key('AZURE_TTS_REGION') or 'eastus')
 
+        # Twitch OAuth Token
         self.create_api_key_row(
             keys_section,
-            row=4,
+            row=5,
             label="Twitch OAuth Token:",
             key_name="TWITCH_OAUTH_TOKEN",
             required=False,
@@ -496,6 +557,7 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - format: oauth:yourtoken"
         )
 
+        # Save Button
         save_frame = tk.Frame(wrapper, bg=self.colors['bg'])
         save_frame.pack(pady=20)
 
@@ -513,6 +575,7 @@ TWITCH_OAUTH_TOKEN=
             height=2
         ).pack()
 
+        # Status Section
         status_frame = self.create_section(wrapper, "API Key Status", 1)
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_columnconfigure(1, weight=1)
@@ -520,6 +583,7 @@ TWITCH_OAUTH_TOKEN=
         self.api_status_labels = {}
         status_keys = [
             ("OpenAI", "OPENAI_API_KEY", True),
+            ("Groq", "GROQ_API_KEY", False),
             ("ElevenLabs", "ELEVENLABS_API_KEY", False),
             ("Azure TTS", "AZURE_TTS_KEY", False),
             ("Twitch", "TWITCH_OAUTH_TOKEN", False)
@@ -688,11 +752,29 @@ TWITCH_OAUTH_TOKEN=
                  font=self.ui_font_bold).grid(row=2, column=0, sticky='w', pady=5)
 
         models = [
+            # OpenAI GPT-5 (Latest)
+            'gpt-5',
+            'gpt-5-mini',
+            'gpt-5-nano',
+
+            # OpenAI GPT-4
             'gpt-4o',
             'gpt-4o-mini',
             'gpt-4-turbo',
             'gpt-4',
-            'gpt-3.5-turbo'
+            'gpt-3.5-turbo',
+
+            # Groq - OpenSource Models
+            '--- Free Open Source ---',
+            'llama-3.1-8b-instant',
+            'llama-3.3-70b-versatile',
+            'llama-3-groq-70b-tool-use',
+            'llama-3-groq-8b-tool-use',
+            'mixtral-8x7b-32768',
+            'qwen/qwen3-32b',
+            'moonshotai/kimi-k2-instruct-0905',
+            'openai/gpt-oss-120b',
+            'openai/gpt-oss-20b'
         ]
         self.llm_var = tk.StringVar(value=self.config['llm_model'])
         llm_menu = ttk.Combobox(config_frame, textvariable=self.llm_var,
@@ -1380,6 +1462,7 @@ TWITCH_OAUTH_TOKEN=
         self.mic_device_menu = ttk.Combobox(mic_section, textvariable=self.mic_device_var,
                                             state='readonly', width=35)
         self.mic_device_menu.grid(row=1, column=1, sticky='w', pady=5)
+        self.mic_device_menu.bind('<<ComboboxSelected>>', lambda e: self.on_mic_device_change())
 
         self.refresh_microphone_list()
 
@@ -1819,6 +1902,12 @@ TWITCH_OAUTH_TOKEN=
 
         self.update_twitch_mode_visibility()
 
+    def on_mic_device_change(self):
+        """Save microphone device when changed"""
+        device = self.mic_device_var.get()
+        self.update_config('mic_device', device)
+        print(f"[App] Microphone device saved: {device}")
+
     def on_twitch_mode_change(self):
         """Handle Twitch response mode change"""
         mode = self.twitch_response_mode_var.get()
@@ -2210,35 +2299,6 @@ TWITCH_OAUTH_TOKEN=
             )
             btn.pack(side='left', padx=2)
 
-        # Transparency toggle
-        transparency_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
-        transparency_frame.pack(fill='x', pady=10)
-
-        self.avatar_transparency_var = tk.BooleanVar(value=self.config.get('avatar_transparency', False))
-        transparency_check = tk.Checkbutton(
-            transparency_frame,
-            text="Enable Transparency (Windows only - makes background color transparent)",
-            variable=self.avatar_transparency_var,
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font,
-            selectcolor=self.colors['entry_bg'],
-            activebackground=self.colors['bg'],
-            activeforeground=self.colors['fg'],
-            command=lambda: self.update_config('avatar_transparency', self.avatar_transparency_var.get())
-        )
-        transparency_check.pack(anchor='w', padx=5)
-
-        tk.Label(
-            transparency_frame,
-            text="Note: Transparency uses the background color. Set to green for best OBS chroma key results.",
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=(self.ui_font[0], 8, 'italic'),
-            wraplength=500,
-            justify='left'
-        ).pack(anchor='w', padx=5, pady=5)
-
         # Apply button
         apply_frame = tk.Frame(bg_color_section, bg=self.colors['bg'])
         apply_frame.pack(pady=15)
@@ -2387,52 +2447,6 @@ TWITCH_OAUTH_TOKEN=
             pady=5
         ).pack(side='left', padx=5)
 
-        # reload_frame = tk.Frame(images_section, bg=self.colors['bg'])
-        # reload_frame.pack(pady=15)
-        #
-        # tk.Button(
-        #     reload_frame,
-        #     text="🔄 Reload Avatar Window",
-        #     command=self.reload_avatar_images,
-        #     bg=self.colors['button'],
-        #     fg='white',
-        #     font=self.ui_font_bold,
-        #     relief='flat',
-        #     cursor='hand2',
-        #     padx=20,
-        #     pady=8
-        # ).pack()
-        #
-        # tk.Label(
-        #     reload_frame,
-        #     text="Click after changing images to update the avatar window",
-        #     bg=self.colors['bg'],
-        #     fg=self.colors['accent'],
-        #     font=(self.ui_font[0], 8, 'italic')
-        # ).pack(pady=5)
-
-        # preview_section = self.create_section(scrollable, "Preview", 5)
-        # preview_section.grid_columnconfigure(0, weight=1)
-        #
-        # preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
-        # preview_container.pack(expand=True)
-        #
-        # preview_border = tk.Frame(preview_container, bg=self.colors['accent'], bd=3, relief='solid')
-        # preview_border.pack(pady=10)
-        #
-        # self.preview_label = tk.Label(
-        #     preview_border,
-        #     text="No image selected\n\nSelect an image above to see preview",
-        #     bg=self.colors['text_bg'],
-        #     fg=self.colors['accent'],
-        #     font=self.ui_font_large,
-        #     width=50,
-        #     height=18,
-        #     relief='flat'
-        # )
-        # self.preview_label.pack(padx=3, pady=3)
-        #
-        # self.load_existing_avatar_previews()
         self.start_audio_meter_updates()
 
     def choose_avatar_color(self):
@@ -2511,38 +2525,17 @@ TWITCH_OAUTH_TOKEN=
             return
 
         color = self.avatar_bg_color_var.get()
-        transparency = self.avatar_transparency_var.get()
 
-        print(f"[App] Applying avatar color: {color}, transparency: {transparency}")
+        print(f"[App] Applying avatar color: {color}")
 
         # Update window background color
         try:
             self.engine.avatar_window.window.configure(bg=color)
             self.engine.avatar_window.image_label.config(bg=color)
 
-            # Apply transparency if enabled
-            if transparency:
-                try:
-                    self.engine.avatar_window.window.attributes('-transparentcolor', color)
-                    print(f"[App] Transparency enabled with color {color}")
-                except Exception as e:
-                    print(f"[App] Transparency not supported: {e}")
-                    messagebox.showwarning(
-                        "Transparency Not Supported",
-                        "Transparency is not supported on your system.\n\n"
-                        "This feature only works on Windows."
-                    )
-            else:
-                # Disable transparency
-                try:
-                    self.engine.avatar_window.window.attributes('-transparentcolor', '')
-                except:
-                    pass
-
             messagebox.showinfo(
                 "Color Applied",
-                f"✅ Background color changed to {color}\n\n"
-                f"Transparency: {'Enabled' if transparency else 'Disabled'}"
+                f"✅ Background color changed to {color}"
             )
 
         except Exception as e:
@@ -2806,6 +2799,7 @@ TWITCH_OAUTH_TOKEN=
             # Update config
             config_key = f'{image_type}_image'
             self.update_config(config_key, filename)
+            self.save_all_settings()
 
             # Update UI display
             display_path = filename
@@ -3661,6 +3655,7 @@ TWITCH_OAUTH_TOKEN=
 
       ✓ Step 1: Configure API Keys (API Keys tab)
         • Add your OpenAI API key (REQUIRED)
+        • If wanting open source models, add your Groq API key
         • Optionally add ElevenLabs, Azure, or Twitch keys
         • Click "Save All API Keys"
 
