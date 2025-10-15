@@ -423,26 +423,11 @@ TWITCH_OAUTH_TOKEN=
 
         scrollable = self.create_scrollable_frame(tab)
 
-        info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
-        info_frame.pack(fill='x', padx=20, pady=20)
+        # Add centered wrapper with  padding
+        wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
+        wrapper.pack(fill='both', expand=True, padx=(835, 0), pady=20)
 
-        info_text = """
-        API Keys Configuration
-        
-        Enter your API keys below. They will be saved to the .env file automatically.
-        Keys are optional except for OpenAI which is required for the chatbot to function.
-        """
-
-        tk.Label(
-            info_frame,
-            text=info_text,
-            bg=self.colors['entry_bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font,
-            justify='left'
-        ).pack(padx=20, pady=20)
-
-        keys_section = self.create_section(scrollable, "API Keys", 0)
+        keys_section = self.create_section(wrapper, "API Keys", 0)
         keys_section.grid_columnconfigure(0, weight=1)
         keys_section.grid_columnconfigure(1, weight=1)
 
@@ -511,7 +496,7 @@ TWITCH_OAUTH_TOKEN=
             description="Optional - format: oauth:yourtoken"
         )
 
-        save_frame = tk.Frame(scrollable, bg=self.colors['bg'])
+        save_frame = tk.Frame(wrapper, bg=self.colors['bg'])
         save_frame.pack(pady=20)
 
         tk.Button(
@@ -528,7 +513,7 @@ TWITCH_OAUTH_TOKEN=
             height=2
         ).pack()
 
-        status_frame = self.create_section(scrollable, "API Key Status", 1)
+        status_frame = self.create_section(wrapper, "API Key Status", 1)
         status_frame.grid_columnconfigure(0, weight=1)
         status_frame.grid_columnconfigure(1, weight=1)
 
