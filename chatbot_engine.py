@@ -8,6 +8,7 @@ from input_handlers import InputManager
 from avatar_window import AvatarWindow
 import os
 from dotenv import load_dotenv
+import re
 
 env_file = Path('.env')
 if env_file.exists():
@@ -80,6 +81,7 @@ class ChatbotEngine:
             'max_response_tokens': 150,
             'twitch_speak_username': True,
             'twitch_speak_message': True,
+            'twitch_strip_emojis': True,
         }
 
     def _build_system_prompt(self):
@@ -309,13 +311,20 @@ class ChatbotEngine:
                         cooldown = self.config.get('twitch_cooldown', 5)
 
                         if current_time - self.last_twitch_response_time >= cooldown:
+                            # Strip keyword from message if in keywords mode
+                            # Strip keyword from message if in keywords mode
+                            cleaned_message = self._strip_keyword_from_message(message)
+
+                            # Strip emojis if enabled
+                            cleaned_message = self._strip_emojis(cleaned_message)
+
                             self.current_twitch_username = username
-                            self.current_twitch_message = message
+                            self.current_twitch_message = cleaned_message
 
                             if self.config.get('twitch_read_username', True):
-                                user_input = f"{username} says: {message}"
+                                user_input = f"{username} says: {cleaned_message}"
                             else:
-                                user_input = message
+                                user_input = cleaned_message
 
                             self._process_and_respond(user_input)
 
@@ -346,6 +355,145 @@ class ChatbotEngine:
             return False
 
         return False
+
+    def _strip_keyword_from_message(self, message):
+        """Remove keyword from message if in keywords mode"""
+        response_mode = self.config.get('twitch_response_mode', 'all')
+
+        if response_mode != 'keywords':
+            return message
+
+        keywords = self.config.get('twitch_keywords', '!ai,!bot').split(',')
+        message_lower = message.lower()
+
+        # Find and remove the first matching keyword
+        for keyword in keywords:
+            keyword = keyword.strip()
+            keyword_lower = keyword.lower()
+
+            # Check if keyword exists in message
+            if keyword_lower in message_lower:
+                # Find the position (case-insensitive)
+                pos = message_lower.find(keyword_lower)
+
+                # Remove the keyword and clean up extra spaces
+                message = (message[:pos] + message[pos + len(keyword):]).strip()
+                break
+
+        return message
+
+    def _strip_emojis(self, text):
+        """Remove emojis, emoticons, and Twitch emotes from text"""
+        if not self.config.get('twitch_strip_emojis', True):
+            return text
+
+        # 1. Remove Unicode emojis
+        emoji_pattern = re.compile(
+            "["
+            "\U0001F600-\U0001F64F"  # emoticons
+            "\U0001F300-\U0001F5FF"  # symbols & pictographs
+            "\U0001F680-\U0001F6FF"  # transport & map symbols
+            "\U0001F1E0-\U0001F1FF"  # flags
+            "\U00002500-\U00002BEF"  # chinese char
+            "\U00002702-\U000027B0"
+            "\U000024C2-\U0001F251"
+            "\U0001f926-\U0001f937"
+            "\U00010000-\U0010ffff"
+            "\u2640-\u2642"
+            "\u2600-\u2B55"
+            "\u200d"
+            "\u23cf"
+            "\u23e9"
+            "\u231a"
+            "\ufe0f"
+            "\u3030"
+            "]+",
+            flags=re.UNICODE
+        )
+        text = emoji_pattern.sub('', text)
+
+        # 2. Remove text-based emoticons (like :), :D, :(, etc.)
+        emoticon_patterns = [
+            r':\)+',  # :) :)) :)))
+            r':\(+',  # :( :(( :(((
+            r':D+',  # :D :DD :DDD
+            r':P+',  # :P :PP
+            r':O+',  # :O :OO
+            r';-?\)+',  # ;) ;-)
+            r';-?\(+',  # ;( ;-(
+            r'<3+',  # <3 <33
+            r'>:\(+',  # >:(
+            r':-?\/+',  # :/ :-/
+            r':-?\|+',  # :| :-|
+            r'xD+',  # xD xDD
+            r'XD+',  # XD XDD
+            r':-?o+',  # :o :-o
+            r':-?O+',  # :O :-O
+            r'8-?\)+',  # 8) 8-)
+            r':-?\*+',  # :* :-*
+            r'B-?\)+',  # B) B-)
+            r':-?S+',  # :S :-S
+            r':-?@+',  # :@ :-@
+            r'T_T+',  # T_T
+            r'ToT+',  # ToT
+            r'\^\^+',  # ^^
+            r'o\.o',  # o.o
+            r'O\.O',  # O.O
+            r'-_-+',  # -_-
+            r'>_<+',  # >_<
+            r'=\)+',  # =) =))
+            r'=\(+',  # =( =((
+            r'=D+',  # =D =DD
+            r'=P+',  # =P =PP
+        ]
+
+        for pattern in emoticon_patterns:
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # 3. Remove common Twitch Global Emotes
+        common_twitch_emotes = [
+            # Global Twitch emotes
+            'Kappa', 'PogChamp', 'LUL', 'TriHard', 'BibleThump', 'SMOrc', 'MingLee',
+            'KappaPride', 'Kreygasm', 'DansGame', 'NotLikeThis', 'ResidentSleeper',
+            'FailFish', 'WutFace', 'PJSalt', 'CoolStoryBob', 'EleGiggle', '4Head',
+            'SSSsss', 'Jebaited', 'SwiftRage', 'PraiseIt', 'CoolCat', 'TwitchLit',
+            'Squid1', 'Squid2', 'Squid3', 'Squid4', 'FBBlock', 'FBCatch', 'FBPass',
+            'FBRun', 'FBSpiral', 'TombRaid', 'TPFufun', 'TheTarFu', 'PunOko',
+            'SabaPing', 'PrimeMe', 'PogBones', 'PopCorn', 'RaccAttack', 'PowerUpL',
+            'PowerUpR', 'SoonerLater', 'KomodoHype', 'StinkyCheese', 'TakeNRG',
+            'TBAngel', 'ThankEgg', 'VoHiYo', 'WholeWheat', 'BlessRNG', 'DoritosChip',
+            'HeyGuys', 'UncleNox', 'FutureMan', 'ItsBoshyTime', 'NewRecord',
+
+            # BTTV emotes (BetterTTV)
+            'KEKW', 'PepeLaugh', 'monkaS', 'Sadge', 'OMEGALUL', 'LULW', 'POGGERS',
+            'Pepega', 'pepeD', 'PepeHands', 'monkaW', 'monkaHmm', 'FeelsGoodMan',
+            'FeelsBadMan', 'FeelsWeirdMan', 'FeelsStrongMan', 'WeirdChamp', 'peepoHappy',
+            'peepoSad', 'Pog', 'EZ', 'CmonBruh', 'haHAA', 'TriDance', 'Clap',
+            'PepeLaugh', 'YEP', 'COCK', 'gachiHYPER', 'HYPERS', 'PauseChamp',
+
+            # FFZ emotes (FrankerFaceZ)
+            'LuL', 'CatBag', 'FeelsAmazingMan', 'PagChomp', 'Clap2', 'widepeepoHappy',
+            'widepeepoSad', 'WAYTOODANK', 'HACKERMANS', 'SourPls', 'WICKED',
+
+            # 7TV emotes
+            'GIGACHAD', 'Aware', 'Clueless', 'Stare', 'Susge', 'Madge', 'Bedge',
+            'Copium', 'Hopium', 'peepoTalk', 'NOTED', 'modCheck', 'Jammies',
+        ]
+
+        # Create word boundary pattern for emote names
+        for emote in common_twitch_emotes:
+            # Use word boundaries to avoid removing parts of words
+            pattern = r'\b' + re.escape(emote) + r'\b'
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        # 4. Remove excessive repeated characters (common in emote spam)
+        # But keep normal doubled letters like "too", "book", etc.
+        text = re.sub(r'(.)\1{3,}', r'\1', text)
+
+        # 5. Clean up excessive spaces
+        text = re.sub(r'\s+', ' ', text)
+
+        return text.strip()
 
     def process_microphone_input(self):
         """Process microphone input"""

@@ -25,5 +25,7 @@
     "custom_response_style": "Get angry when people insult Skyrim or Fallout. Get angry when people specifically say Fallout New Vegas. Act like you think you're the best game developer in the world. Act like you get really angry when people say anything negative about your games.",
     "elevenlabs_similarity": 0.8,
     "volume_threshold": 0.252,
-    "avatar_bg_color": "#5F13EC"
+    "avatar_bg_color": "#5F13EC",
+    "twitch_response_mode": "all",
+    "twitch_strip_emojis": false
 }

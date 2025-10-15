@@ -1655,6 +1655,25 @@ TWITCH_OAUTH_TOKEN=
         )
         speak_message_check.grid(row=7, column=1, sticky='w', pady=5)
 
+        tk.Label(twitch_section, text="Strip Emojis:",
+                 bg=self.colors['bg'], fg=self.colors['fg'],
+                 font=self.ui_font).grid(row=8, column=0, sticky='w', pady=5)
+
+        self.twitch_strip_emojis_var = tk.BooleanVar(value=self.config.get('twitch_strip_emojis', True))
+        strip_emojis_check = tk.Checkbutton(
+            twitch_section,
+            text='Remove emojis from messages before TTS',
+            variable=self.twitch_strip_emojis_var,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            selectcolor=self.colors['entry_bg'],
+            activebackground=self.colors['bg'],
+            activeforeground=self.colors['fg'],
+            command=lambda: self.update_config('twitch_strip_emojis', self.twitch_strip_emojis_var.get())
+        )
+        strip_emojis_check.grid(row=8, column=1, sticky='w', pady=5)
+
         tk.Label(
             twitch_section,
             text='Example: When both checked, TTS will say "Username said: their message. [Bot\'s response]"',
@@ -1663,7 +1682,7 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 8, 'italic'),
             wraplength=500,
             justify='left'
-        ).grid(row=8, column=0, columnspan=2, sticky='w', pady=(0, 10))
+        ).grid(row=9, column=0, columnspan=2, sticky='w', pady=(0, 10))
 
         tk.Label(
             twitch_section,
@@ -1671,7 +1690,7 @@ TWITCH_OAUTH_TOKEN=
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=self.ui_font_bold
-        ).grid(row=9, column=0, columnspan=2, sticky='w', pady=(15, 5))
+        ).grid(row=10, column=0, columnspan=2, sticky='w', pady=(15, 5))
 
         tk.Label(twitch_section, text="Response Mode:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
@@ -1686,7 +1705,7 @@ TWITCH_OAUTH_TOKEN=
             state='readonly',
             width=15
         )
-        twitch_mode_menu.grid(row=10, column=1, sticky='w', pady=5)
+        twitch_mode_menu.grid(row=11, column=1, sticky='w', pady=5)
         twitch_mode_menu.bind('<<ComboboxSelected>>',
                               lambda e: self.on_twitch_mode_change())
 
@@ -1706,10 +1725,10 @@ TWITCH_OAUTH_TOKEN=
             wraplength=400,
             justify='left'
         )
-        self.twitch_mode_desc.grid(row=11, column=0, columnspan=2, sticky='w', pady=5)
+        self.twitch_mode_desc.grid(row=12, column=0, columnspan=2, sticky='w', pady=5)
 
         self.twitch_keywords_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        self.twitch_keywords_frame.grid(row=12, column=0, columnspan=2, sticky='ew', pady=5)
+        self.twitch_keywords_frame.grid(row=13, column=0, columnspan=2, sticky='ew', pady=5)
 
         tk.Label(
             self.twitch_keywords_frame,
@@ -1734,7 +1753,7 @@ TWITCH_OAUTH_TOKEN=
                                                                      self.twitch_keywords_entry.get()))
 
         self.twitch_chance_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        self.twitch_chance_frame.grid(row=13, column=0, columnspan=2, sticky='w', pady=5)
+        self.twitch_chance_frame.grid(row=14, column=0, columnspan=2, sticky='w', pady=5)
 
         tk.Label(
             self.twitch_chance_frame,
@@ -1772,10 +1791,10 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Label(twitch_section, text="Response Cooldown:",
                  bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=self.ui_font).grid(row=14, column=0, sticky='w', pady=5)
+                 font=self.ui_font).grid(row=15, column=0, sticky='w', pady=5)
 
         cooldown_frame = tk.Frame(twitch_section, bg=self.colors['bg'])
-        cooldown_frame.grid(row=14, column=1, sticky='w', pady=5)
+        cooldown_frame.grid(row=15, column=1, sticky='w', pady=5)
 
         self.twitch_cooldown_var = tk.IntVar(value=self.config.get('twitch_cooldown', 5))
         cooldown_slider = tk.Scale(
@@ -1811,7 +1830,7 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 9, 'italic'),
             wraplength=500,
             justify='left'
-        ).grid(row=15, column=0, columnspan=2, sticky='w', pady=5)
+        ).grid(row=16, column=0, columnspan=2, sticky='w', pady=5)
 
         self.update_twitch_mode_visibility()
 
@@ -2383,52 +2402,52 @@ TWITCH_OAUTH_TOKEN=
             pady=5
         ).pack(side='left', padx=5)
 
-        reload_frame = tk.Frame(images_section, bg=self.colors['bg'])
-        reload_frame.pack(pady=15)
+        # reload_frame = tk.Frame(images_section, bg=self.colors['bg'])
+        # reload_frame.pack(pady=15)
+        #
+        # tk.Button(
+        #     reload_frame,
+        #     text="🔄 Reload Avatar Window",
+        #     command=self.reload_avatar_images,
+        #     bg=self.colors['button'],
+        #     fg='white',
+        #     font=self.ui_font_bold,
+        #     relief='flat',
+        #     cursor='hand2',
+        #     padx=20,
+        #     pady=8
+        # ).pack()
+        #
+        # tk.Label(
+        #     reload_frame,
+        #     text="Click after changing images to update the avatar window",
+        #     bg=self.colors['bg'],
+        #     fg=self.colors['accent'],
+        #     font=(self.ui_font[0], 8, 'italic')
+        # ).pack(pady=5)
 
-        tk.Button(
-            reload_frame,
-            text="🔄 Reload Avatar Window",
-            command=self.reload_avatar_images,
-            bg=self.colors['button'],
-            fg='white',
-            font=self.ui_font_bold,
-            relief='flat',
-            cursor='hand2',
-            padx=20,
-            pady=8
-        ).pack()
-
-        tk.Label(
-            reload_frame,
-            text="Click after changing images to update the avatar window",
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=(self.ui_font[0], 8, 'italic')
-        ).pack(pady=5)
-
-        preview_section = self.create_section(scrollable, "Preview", 5)
-        preview_section.grid_columnconfigure(0, weight=1)
-
-        preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
-        preview_container.pack(expand=True)
-
-        preview_border = tk.Frame(preview_container, bg=self.colors['accent'], bd=3, relief='solid')
-        preview_border.pack(pady=10)
-
-        self.preview_label = tk.Label(
-            preview_border,
-            text="No image selected\n\nSelect an image above to see preview",
-            bg=self.colors['text_bg'],
-            fg=self.colors['accent'],
-            font=self.ui_font_large,
-            width=50,
-            height=18,
-            relief='flat'
-        )
-        self.preview_label.pack(padx=3, pady=3)
-
-        self.load_existing_avatar_previews()
+        # preview_section = self.create_section(scrollable, "Preview", 5)
+        # preview_section.grid_columnconfigure(0, weight=1)
+        #
+        # preview_container = tk.Frame(preview_section, bg=self.colors['bg'])
+        # preview_container.pack(expand=True)
+        #
+        # preview_border = tk.Frame(preview_container, bg=self.colors['accent'], bd=3, relief='solid')
+        # preview_border.pack(pady=10)
+        #
+        # self.preview_label = tk.Label(
+        #     preview_border,
+        #     text="No image selected\n\nSelect an image above to see preview",
+        #     bg=self.colors['text_bg'],
+        #     fg=self.colors['accent'],
+        #     font=self.ui_font_large,
+        #     width=50,
+        #     height=18,
+        #     relief='flat'
+        # )
+        # self.preview_label.pack(padx=3, pady=3)
+        #
+        # self.load_existing_avatar_previews()
         self.start_audio_meter_updates()
 
     def choose_avatar_color(self):
@@ -2818,7 +2837,7 @@ TWITCH_OAUTH_TOKEN=
                 self.idle_path_label.config(text=display_path, fg=self.colors['fg'])
 
             # Update preview
-            self.update_avatar_preview(filename)
+            # self.update_avatar_preview(filename)
 
             # Auto-reload in avatar window if it exists
             if self.engine.avatar_window:
