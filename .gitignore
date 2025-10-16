@@ -214,3 +214,6 @@ ffmpeg_binaries/ffprobe.exe
 ffprobe.exe
 *.onnx
 *.wav
+*.zip
+*.png
+*.exe

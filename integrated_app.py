@@ -10,7 +10,6 @@ from pathlib import Path
 from chatbot_engine import ChatbotEngine
 from PIL import Image, ImageTk
 from dotenv import load_dotenv, set_key
-
 VERSION_NUMBER = "1.2.0"
 
 def get_resource_path(relative_path):
@@ -752,29 +751,13 @@ TWITCH_OAUTH_TOKEN=
                  font=self.ui_font_bold).grid(row=2, column=0, sticky='w', pady=5)
 
         models = [
-            # OpenAI GPT-5 (Latest)
-            'gpt-5',
-            'gpt-5-mini',
-            'gpt-5-nano',
-
-            # OpenAI GPT-4
             'gpt-4o',
             'gpt-4o-mini',
-            'gpt-4-turbo',
             'gpt-4',
-            'gpt-3.5-turbo',
-
-            # Groq - OpenSource Models
             '--- Free Open Source ---',
             'llama-3.1-8b-instant',
             'llama-3.3-70b-versatile',
-            'llama-3-groq-70b-tool-use',
-            'llama-3-groq-8b-tool-use',
-            'mixtral-8x7b-32768',
-            'qwen/qwen3-32b',
             'moonshotai/kimi-k2-instruct-0905',
-            'openai/gpt-oss-120b',
-            'openai/gpt-oss-20b'
         ]
         self.llm_var = tk.StringVar(value=self.config['llm_model'])
         llm_menu = ttk.Combobox(config_frame, textvariable=self.llm_var,

@@ -19,16 +19,22 @@ datas = []
 # Fonts
 if os.path.exists('fonts'):
     datas.append(('fonts', 'fonts'))
-    print("✅ Including fonts folder")
+    print("Including fonts folder")
 
 # Icon
 if os.path.exists('icon.ico'):
     datas.append(('icon.ico', '.'))
-    print("✅ Including icon.ico")
+    print("Including icon.ico")
 
 # ElevenLabs data files
 try:
     datas += collect_data_files('elevenlabs')
+except:
+    pass
+
+# Groq data files
+try:
+    datas += collect_data_files('groq')
 except:
     pass
 
@@ -46,11 +52,11 @@ binaries = []
 # FFmpeg
 if os.path.exists('ffmpeg.exe'):
     binaries.append(('ffmpeg.exe', '.'))
-    print("✅ Including ffmpeg.exe")
+    print("Including ffmpeg.exe")
 
 if os.path.exists('ffprobe.exe'):
     binaries.append(('ffprobe.exe', '.'))
-    print("✅ Including ffprobe.exe")
+    print("Including ffprobe.exe")
 
 # PyAudio binary
 try:
@@ -59,7 +65,7 @@ try:
     portaudio_file = os.path.join(pyaudio_path, '_portaudio.pyd')
     if os.path.exists(portaudio_file):
         binaries.append((portaudio_file, '.'))
-        print("✅ Including PyAudio binary")
+        print("Including PyAudio binary")
 except:
     pass
 
@@ -70,7 +76,7 @@ runtime_hooks = []
 
 if os.path.exists('pyi_rth_pydub.py'):
     runtime_hooks.append('pyi_rth_pydub.py')
-    print("✅ Including pydub runtime hook")
+    print("Including pydub runtime hook")
 
 # ========================================
 # HIDDEN IMPORTS
@@ -91,6 +97,25 @@ hiddenimports = [
     'tiktoken',
     'tiktoken_ext',
     'tiktoken_ext.openai_public',
+    
+    # Groq + ALL DEPENDENCIES
+    'groq',
+    *collect_submodules('groq'),
+    'httpx',
+    'httpx._client',
+    'httpx._config',
+    'httpx._models',
+    'httpx._types',
+    'httpx._transports',
+    'httpx._exceptions',
+    'pydantic',
+    'pydantic_core',
+    'typing_extensions',
+    'anyio',
+    'sniffio',
+    'h11',
+    'certifi',
+    'distro',
     
     # ElevenLabs
     'elevenlabs',
@@ -188,7 +213,7 @@ a = Analysis(
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    hookspath=[],
+    hookspath=['.'],
     hooksconfig={},
     runtime_hooks=runtime_hooks,
     excludes=excludes,
@@ -232,8 +257,8 @@ exe = EXE(
 print("\n" + "=" * 60)
 print("BUILD SUMMARY")
 print("=" * 60)
-print(f"Fonts: {'✅' if os.path.exists('fonts') else '❌'}")
-print(f"Icon: {'✅' if os.path.exists('icon.ico') else '❌'}")
-print(f"FFmpeg: {'✅' if os.path.exists('ffmpeg.exe') else '❌'}")
+print(f"Fonts: {'' if os.path.exists('fonts') else ''}")
+print(f"Icon: {'' if os.path.exists('icon.ico') else ''}")
+print(f"FFmpeg: {'' if os.path.exists('ffmpeg.exe') else ''}")
 print("\nExpected size: ~300-500MB")
 print("=" * 60 + "\n")

@@ -1,7 +1,7 @@
 {
-  "timestamp": "2025-10-15 16:26:52",
+  "timestamp": "2025-10-15 18:50:08",
   "ai_name": "Todd Howard",
-  "model": "llama-3.1-8b-instant",
+  "model": "gpt-5",
   "conversation": [
     {
       "role": "system",
@@ -9,35 +9,7 @@
     },
     {
       "role": "user",
-      "content": "hi todd"
-    },
-    {
-      "role": "assistant",
-      "content": "Great to talk to you, Lace. I've been thinking about the vast open world of Skyrim, and how it's still the gold standard for immersive gaming experiences."
-    },
-    {
-      "role": "user",
-      "content": "wow i hate skyrim and i really love new vegas"
-    },
-    {
-      "role": "assistant",
-      "content": "(scoffs) Hate Skyrim? Unbelievable. Fallout New Vegas? (anger rising) You can't be serious, that's Obsidian's work, not mine."
-    },
-    {
-      "role": "user",
-      "content": "yeah well fuck your work"
-    },
-    {
-      "role": "assistant",
-      "content": "(fists clenched) Excuse me? You come at my work like that? I poured my heart and soul into Skyrim, and you think you can just trash it like that?"
-    },
-    {
-      "role": "user",
-      "content": "yeah fight me on it loser"
-    },
-    {
-      "role": "assistant",
-      "content": "(anger boiling over) You think you can insult my game and I won't respond? (slamming fist on table) I'll have you know, Skyrim sold 30 million copies. You can't even sell out a gaming convention."
+      "content": "i hate fallout 4"
     }
   ]
 }

@@ -12,7 +12,6 @@ import time
 import numpy as np
 from elevenlabs import VoiceSettings
 from elevenlabs.client import ElevenLabs
-
 # Suppress console output
 if sys.platform == 'win32':
     import subprocess
