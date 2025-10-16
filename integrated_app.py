@@ -337,7 +337,7 @@ TWITCH_OAUTH_TOKEN=
     def create_chat_tab(self, notebook):
         """Chat interface tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='💬 Chat')
+        notebook.add(tab, text='Chat')
 
         container = tk.Frame(tab, bg=self.colors['bg'])
         container.pack(fill='both', expand=True, padx=25, pady=20)
@@ -468,7 +468,7 @@ TWITCH_OAUTH_TOKEN=
     def create_api_keys_tab(self, notebook):
         """API Keys management tab"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🔑 API Keys')
+        notebook.add(tab, text='API Keys')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -740,7 +740,7 @@ TWITCH_OAUTH_TOKEN=
     def create_setup_tab(self, notebook):
         """Setup tab with GPT models, personality, memory, response length"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='⚙️ Setup')
+        notebook.add(tab, text='Setup')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1052,45 +1052,6 @@ TWITCH_OAUTH_TOKEN=
         )
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
-        # test_section = self.create_section(wrapper, "Test Bot's Connection", 4)
-        # test_section.grid_columnconfigure(0, weight=1)
-        # test_section.grid_columnconfigure(1, weight=1)
-        #
-        # test_info = tk.Label(
-        #     test_section,
-        #     text="Test your OpenAI API key and model configuration before starting the full chatbot:",
-        #     bg=self.colors['bg'],
-        #     fg=self.colors['fg'],
-        #     font=self.ui_font,
-        #     wraplength=600,
-        #     justify='left'
-        # )
-        # test_info.grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
-        #
-        # test_btn = tk.Button(
-        #     test_section,
-        #     text="🧪 Test Bot's Connection",
-        #     command=self.test_ai_connection,
-        #     bg='#2196F3',
-        #     fg='white',
-        #     font=self.ui_font_bold,
-        #     relief='flat',
-        #     cursor='hand2',
-        #     width=20
-        # )
-        # test_btn.grid(row=1, column=0, pady=10)
-        #
-        # self.test_status_label = tk.Label(
-        #     test_section,
-        #     text="",
-        #     bg=self.colors['bg'],
-        #     fg=self.colors['fg'],
-        #     font=self.ui_font,
-        #     wraplength=600,
-        #     justify='left'
-        # )
-        # self.test_status_label.grid(row=1, column=1, sticky='w', padx=10)
-
     def on_response_length_change(self):
         """Handle response length selection change"""
         length = self.response_length_var.get()
@@ -1174,7 +1135,7 @@ TWITCH_OAUTH_TOKEN=
     def create_tts_tab(self, notebook):
         """TTS tab with dynamic voice dropdown and voice testing"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🔊 TTS')
+        notebook.add(tab, text='TTS')
 
         scrollable = self.create_scrollable_frame(tab)
 
@@ -1437,7 +1398,7 @@ TWITCH_OAUTH_TOKEN=
     def create_inputs_tab(self, notebook):
         """Inputs tab with microphone, screenshot, and Twitch settings"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🎤 Inputs')
+        notebook.add(tab, text='Inputs')
 
         scrollable = self.create_scrollable_frame(tab)
         wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
@@ -2085,7 +2046,7 @@ TWITCH_OAUTH_TOKEN=
             pady=5
         ).pack(side='left', padx=5)
 
-        sensitivity_section = self.create_section(wrapper, "🎚️ Audio Sensitivity Controls", 1)
+        sensitivity_section = self.create_section(wrapper, "Audio Sensitivity Controls", 1)
         sensitivity_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
@@ -2153,7 +2114,7 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 9)
         ).pack(side='right')
 
-        meter_section = self.create_section(wrapper, "🎵 Real-Time Audio Meter", 2)
+        meter_section = self.create_section(wrapper, "Real-Time Audio Meter", 2)
         meter_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
@@ -2206,7 +2167,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Button(
             test_frame,
-            text="🎤 Test Audio Sensitivity",
+            text="Test Audio Sensitivity",
             command=self.test_audio_sensitivity,
             bg='#2196F3',
             fg='white',
@@ -2227,7 +2188,7 @@ TWITCH_OAUTH_TOKEN=
         ).pack(pady=5)
 
         # Background Color Settings Section
-        bg_color_section = self.create_section(wrapper, "🎨 Background Color Settings", 3)
+        bg_color_section = self.create_section(wrapper, "Background Color Settings", 3)
         bg_color_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
@@ -2336,7 +2297,7 @@ TWITCH_OAUTH_TOKEN=
 
         tk.Button(
             apply_frame,
-            text="🎨 Apply Color & Reload Avatar",
+            text="Apply Color & Reload Avatar",
             command=self.apply_avatar_color,
             bg='#9370DB',
             fg='white',
@@ -3738,10 +3699,30 @@ TWITCH_OAUTH_TOKEN=
 
                         # Apply update and restart
                         if updater.apply_update(new_exe):
-                            print("[App] Update applied, restarting...")
-                            # Exit the app - batch script will restart it
-                            self.root.quit()
-                            sys.exit(0)
+                            print("[App] Update script launched, closing app...")
+
+                            # Gracefully close everything
+                            try:
+                                # Stop the engine if running
+                                if hasattr(self, 'engine') and self.engine:
+                                    if self.engine.is_running:
+                                        self.engine.stop()
+
+                                # Process any remaining events
+                                self.root.update()
+
+                                # Destroy the window
+                                self.root.destroy()
+                            except:
+                                pass
+
+                            # Small delay to let window close
+                            import time
+                            time.sleep(0.5)
+
+                            # Force exit
+                            import os
+                            os._exit(0)
                         else:
                             messagebox.showerror(
                                 "Update Failed",
@@ -3839,11 +3820,39 @@ TWITCH_OAUTH_TOKEN=
                     if new_exe:
                         print("[App] Download complete, applying update...")
 
-                        # Apply update and restart
+                        # Close progress window FIRST
+                        if dialog.download_window:
+                            try:
+                                dialog.download_window.destroy()
+                            except:
+                                pass
+
+                        # Apply update
                         if updater.apply_update(new_exe):
-                            print("[App] Update applied, restarting...")
-                            self.root.quit()
-                            sys.exit(0)
+                            print("[App] Update script launched, closing app...")
+
+                            # Gracefully close everything
+                            try:
+                                # Stop the engine if running
+                                if hasattr(self, 'engine') and self.engine:
+                                    if self.engine.is_running:
+                                        self.engine.stop()
+
+                                # Process any remaining events
+                                self.root.update()
+
+                                # Destroy the window
+                                self.root.destroy()
+                            except:
+                                pass
+
+                            # Small delay to let window close
+                            import time
+                            time.sleep(0.5)
+
+                            # Force exit
+                            import os
+                            os._exit(0)
                         else:
                             messagebox.showerror(
                                 "Update Failed",
@@ -3854,10 +3863,12 @@ TWITCH_OAUTH_TOKEN=
                             "Download Failed",
                             "Failed to download update. Please check your internet connection."
                         )
-
-                    # Close progress window
-                    if dialog.download_window:
-                        dialog.download_window.destroy()
+                        # Close progress window on failure
+                        if dialog.download_window:
+                            try:
+                                dialog.download_window.destroy()
+                            except:
+                                pass
             else:
                 # No updates available
                 print("[App] No updates available")
@@ -3890,73 +3901,85 @@ class UpdateDialog:
         self.download_window = None
 
         dialog = tk.Toplevel(parent)
-        dialog.title("Update Available")
-        dialog.geometry("500x400")
+        dialog.title("Heyyyy xD")
+        dialog.geometry("550x450")
         dialog.resizable(False, False)
         dialog.transient(parent)
         dialog.grab_set()
 
         # Center the dialog
         dialog.update_idletasks()
-        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
-        y = (dialog.winfo_screenheight() // 2) - (400 // 2)
-        dialog.geometry(f"500x400+{x}+{y}")
+        x = (dialog.winfo_screenwidth() // 2) - (275)
+        y = (dialog.winfo_screenheight() // 2) - (225)
+        dialog.geometry(f"550x450+{x}+{y}")
+
+        # Main container with background
+        main_container = tk.Frame(dialog, bg='white')
+        main_container.pack(fill='both', expand=True)
 
         # Header
-        header = tk.Frame(dialog, bg='#9370DB', height=60)
+        header = tk.Frame(main_container, bg='#9370DB', height=80)
         header.pack(fill='x')
         header.pack_propagate(False)
 
         tk.Label(
             header,
-            text="🎉 New Version Available!",
+            text="Woah an update!",
             bg='#9370DB',
             fg='white',
-            font=('Arial', 14, 'bold')
-        ).pack(pady=15)
+            font=('Arial', 16, 'bold')
+        ).pack(pady=25)
 
-        # Content
-        content = tk.Frame(dialog, bg='white')
-        content.pack(fill='both', expand=True, padx=20, pady=20)
+        # Content area with padding
+        content = tk.Frame(main_container, bg='white')
+        content.pack(fill='both', expand=True, padx=25, pady=20)
 
         # Version info
-        info_frame = tk.Frame(content, bg='#F0F0F0', relief='solid', bd=1)
+        info_frame = tk.Frame(content, bg='#F8F9FA', relief='solid', bd=1)
         info_frame.pack(fill='x', pady=(0, 15))
 
-        tk.Label(
-            info_frame,
-            text=f"Current Version: {updater.CURRENT_VERSION}",
-            bg='#F0F0F0',
-            font=('Arial', 10)
-        ).pack(anchor='w', padx=10, pady=5)
+        version_inner = tk.Frame(info_frame, bg='#F8F9FA')
+        version_inner.pack(padx=15, pady=12)
 
         tk.Label(
-            info_frame,
+            version_inner,
+            text=f"Current Version: {updater.CURRENT_VERSION}",
+            bg='#F8F9FA',
+            fg='#6c757d',
+            font=('Arial', 10)
+        ).pack(anchor='w')
+
+        tk.Label(
+            version_inner,
             text=f"New Version: {update_info['version']}",
-            bg='#F0F0F0',
-            font=('Arial', 10, 'bold'),
-            fg='#2E7D32'
-        ).pack(anchor='w', padx=10, pady=5)
+            bg='#F8F9FA',
+            fg='#28a745',
+            font=('Arial', 11, 'bold')
+        ).pack(anchor='w', pady=(3, 0))
 
         # Release notes
         tk.Label(
             content,
             text="What's New:",
             bg='white',
-            font=('Arial', 10, 'bold')
-        ).pack(anchor='w', pady=(0, 5))
+            fg='#212529',
+            font=('Arial', 11, 'bold')
+        ).pack(anchor='w', pady=(0, 8))
 
         notes_frame = tk.Frame(content, bg='white')
-        notes_frame.pack(fill='both', expand=True)
+        notes_frame.pack(fill='both', expand=True, pady=(0, 15))
 
         notes_text = tk.Text(
             notes_frame,
             wrap='word',
-            height=10,
+            height=8,
             bg='#FAFAFA',
+            fg='#212529',
             font=('Arial', 9),
             relief='solid',
-            bd=1
+            bd=1,
+            padx=10,
+            pady=10
         )
         notes_text.pack(side='left', fill='both', expand=True)
 
@@ -3967,9 +3990,33 @@ class UpdateDialog:
         notes_text.insert('1.0', update_info['notes'])
         notes_text.config(state='disabled')
 
+        # Note about manual restart - styled better
+        note_frame = tk.Frame(content, bg='#fff3cd', relief='solid', bd=1)
+        note_frame.pack(fill='x', pady=(0, 15))
+
+        note_inner = tk.Frame(note_frame, bg='#fff3cd')
+        note_inner.pack(fill='x', padx=12, pady=10)
+
+        tk.Label(
+            note_inner,
+            text="👁️",
+            bg='#fff3cd',
+            font=('Arial', 14)
+        ).pack(side='left', padx=(0, 8))
+
+        tk.Label(
+            note_inner,
+            text="You'll need to manually re-launch this exe after the update completes.",
+            bg='#fff3cd',
+            fg='#856404',
+            font=('Arial', 9),
+            wraplength=450,
+            justify='left'
+        ).pack(side='left', fill='x', expand=True)
+
         # Buttons
-        button_frame = tk.Frame(dialog, bg='white')
-        button_frame.pack(fill='x', padx=20, pady=(0, 20))
+        button_frame = tk.Frame(content, bg='white')
+        button_frame.pack(fill='x')
 
         def on_update():
             self.result = True
@@ -3987,8 +4034,8 @@ class UpdateDialog:
             fg='white',
             font=('Arial', 10, 'bold'),
             relief='flat',
-            padx=30,
-            pady=10,
+            padx=35,
+            pady=12,
             cursor='hand2'
         )
         update_btn.pack(side='left', padx=(0, 10))
@@ -4002,7 +4049,7 @@ class UpdateDialog:
             font=('Arial', 10),
             relief='flat',
             padx=30,
-            pady=10,
+            pady=12,
             cursor='hand2'
         )
         skip_btn.pack(side='left')

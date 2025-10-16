@@ -232,7 +232,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='LacesAIChatbot',
+    name='LacesTotalTTSBot',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

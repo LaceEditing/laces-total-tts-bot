@@ -8,14 +8,15 @@ import sys
 import json
 import subprocess
 import tempfile
+import zipfile
 from pathlib import Path
 from urllib.request import urlopen, Request
 from urllib.error import URLError
 
-# GitHub repo info
-GITHUB_OWNER = "LaceEditing"
-GITHUB_REPO = "tts-bot-releases"
-CURRENT_VERSION = "1.3.0"
+# GitHub repo info - UPDATE THESE
+GITHUB_OWNER = "LaceEditing"  # Replace with your GitHub username
+GITHUB_REPO = "tts-bot-releases"  # Replace with your repo name
+CURRENT_VERSION = "1.2.0"  # Matches VERSION_NUMBER in integrated_app.py
 
 
 def parse_version(version_str):
@@ -40,9 +41,9 @@ def check_for_updates():
         latest_version = data['tag_name'].lstrip('v')
         download_url = None
 
-        # Find the .exe asset
+        # Look for .zip or .exe file
         for asset in data['assets']:
-            if asset['name'].endswith('.exe'):
+            if asset['name'].endswith('.zip') or asset['name'].endswith('.exe'):
                 download_url = asset['browser_download_url']
                 break
 
@@ -76,7 +77,8 @@ def download_update(download_url, progress_callback=None):
 
             # Create temp file
             temp_dir = tempfile.gettempdir()
-            temp_file = os.path.join(temp_dir, 'chatbot_update.exe')
+            is_zip = download_url.endswith('.zip')
+            temp_file = os.path.join(temp_dir, 'chatbot_update.zip' if is_zip else 'chatbot_update.exe')
 
             downloaded = 0
             chunk_size = 8192
@@ -94,6 +96,35 @@ def download_update(download_url, progress_callback=None):
                         progress = int((downloaded / total_size) * 100)
                         progress_callback(progress)
 
+            # If it's a zip, extract the exe
+            if is_zip:
+                extract_dir = os.path.join(temp_dir, 'chatbot_update_extracted')
+                os.makedirs(extract_dir, exist_ok=True)
+
+                with zipfile.ZipFile(temp_file, 'r') as zip_ref:
+                    zip_ref.extractall(extract_dir)
+
+                # Find the main exe file (exclude utilities like ffmpeg)
+                excluded_exes = ['ffmpeg.exe', 'ffprobe.exe', 'ffplay.exe']
+                exe_candidates = []
+
+                for root, dirs, files in os.walk(extract_dir):
+                    for file in files:
+                        if file.endswith('.exe') and file.lower() not in [e.lower() for e in excluded_exes]:
+                            full_path = os.path.join(root, file)
+                            file_size = os.path.getsize(full_path)
+                            exe_candidates.append((full_path, file_size))
+
+                if not exe_candidates:
+                    print("[Updater] No main exe found in zip file (only utilities found)")
+                    return None
+
+                # Use the largest exe (main app is typically much larger than utilities)
+                exe_file = max(exe_candidates, key=lambda x: x[1])[0]
+                print(f"[Updater] Found main exe: {os.path.basename(exe_file)} ({exe_candidates[0][1] / (1024*1024):.1f} MB)")
+
+                return exe_file
+
             return temp_file
 
     except Exception as e:
@@ -102,38 +133,76 @@ def download_update(download_url, progress_callback=None):
 
 
 def apply_update(new_exe_path):
-    """Apply the update by creating a batch script that replaces the exe"""
+    """Apply the update by creating a VBScript that replaces the exe"""
     try:
         current_exe = sys.executable
+        exe_name = os.path.basename(current_exe)
 
-        # Create batch script in temp directory
-        batch_script = os.path.join(tempfile.gettempdir(), 'update_chatbot.bat')
+        # Create VBScript in temp directory
+        vbs_script = os.path.join(tempfile.gettempdir(), 'update_chatbot.vbs')
 
-        batch_content = f"""@echo off
-echo Updating chatbot...
-timeout /t 2 /nobreak > nul
-:retry
-del "{current_exe}" 2>nul
-if exist "{current_exe}" (
-    timeout /t 1 /nobreak > nul
-    goto retry
-)
-move /Y "{new_exe_path}" "{current_exe}"
-if errorlevel 1 (
-    echo Update failed!
-    pause
-    exit /b 1
-)
-start "" "{current_exe}"
-del "%~f0"
-"""
+        # VBScript just updates the exe and notifies user
+        vbs_content = f'''Set WshShell = CreateObject("WScript.Shell")
+Set FSO = CreateObject("Scripting.FileSystemObject")
 
-        with open(batch_script, 'w') as f:
-            f.write(batch_content)
+' Wait for app to close
+WScript.Sleep 3000
 
-        # Run batch script and exit current app
-        subprocess.Popen(['cmd', '/c', batch_script],
-                         creationflags=subprocess.CREATE_NO_WINDOW)
+' Kill any remaining processes
+On Error Resume Next
+WshShell.Run "taskkill /F /IM {exe_name} /T", 0, True
+On Error Goto 0
+
+' Wait again
+WScript.Sleep 2000
+
+' Delete old exe with retry
+For i = 1 To 10
+    On Error Resume Next
+    FSO.DeleteFile "{current_exe}", True
+    On Error Goto 0
+    
+    If Not FSO.FileExists("{current_exe}") Then
+        Exit For
+    End If
+    
+    WScript.Sleep 500
+Next
+
+' Wait for deletion
+WScript.Sleep 1000
+
+' Move new exe
+On Error Resume Next
+FSO.MoveFile "{new_exe_path}", "{current_exe}"
+On Error Goto 0
+
+' Verify it worked and show message
+If FSO.FileExists("{current_exe}") Then
+    MsgBox "Update complete! Please restart the application.", vbInformation + vbOKOnly, "Update Successful"
+Else
+    MsgBox "Update failed. Please try again or download manually.", vbCritical + vbOKOnly, "Update Failed"
+End If
+
+' Cleanup
+On Error Resume Next
+FSO.DeleteFile WScript.ScriptFullName, True
+On Error Goto 0
+'''
+
+        with open(vbs_script, 'w') as f:
+            f.write(vbs_content)
+
+        # Run VBScript completely detached
+        subprocess.Popen(
+            ['wscript.exe', vbs_script],
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL
+        )
+
         return True
 
     except Exception as e:
