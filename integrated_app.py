@@ -10,7 +10,9 @@ from pathlib import Path
 from chatbot_engine import ChatbotEngine
 from PIL import Image, ImageTk
 from dotenv import load_dotenv, set_key
-VERSION_NUMBER = "1.2.0"
+import updater
+
+VERSION_NUMBER = updater.CURRENT_VERSION
 
 def get_resource_path(relative_path):
     """Get path that works in both script and PyInstaller exe"""
@@ -56,6 +58,9 @@ class IntegratedChatbotApp:
         self.set_window_icon()
 
         self.root.after(1, self.set_title_bar_color)
+        self.create_menu_bar()
+        self.root.after(1000, self.check_for_updates)
+
 
         self.engine = ChatbotEngine()
         self.engine.on_volume_update = lambda vol: self.update_audio_meter(vol) if hasattr(self,
@@ -739,7 +744,10 @@ TWITCH_OAUTH_TOKEN=
 
         scrollable = self.create_scrollable_frame(tab)
 
-        config_frame = self.create_section(scrollable, "Bot Configuration", 0)
+        wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
+        wrapper.pack(fill='both', expand=True, padx=(55, 0), pady=20)
+
+        config_frame = self.create_section(wrapper, "Bot Configuration", 0)
         config_frame.grid_columnconfigure(0, weight=1)
         config_frame.grid_columnconfigure(1, weight=1)
 
@@ -775,7 +783,7 @@ TWITCH_OAUTH_TOKEN=
         )
         info_label.grid(row=3, column=0, columnspan=2, sticky='w', pady=5)
 
-        response_section = self.create_section(scrollable, "Response Length & Style", 1)
+        response_section = self.create_section(wrapper, "Response Length & Style", 1)
         response_section.grid_columnconfigure(0, weight=1)
         response_section.grid_columnconfigure(1, weight=1)
 
@@ -932,7 +940,7 @@ TWITCH_OAUTH_TOKEN=
         )
         self.style_desc_label.grid(row=5, column=0, columnspan=2, sticky='w', pady=5)
 
-        memory_section = self.create_section(scrollable, "Memory & Context Settings", 2)
+        memory_section = self.create_section(wrapper, "Memory & Context Settings", 2)
         memory_section.grid_columnconfigure(0, weight=1)
         memory_section.grid_columnconfigure(1, weight=1)
 
@@ -1008,7 +1016,7 @@ TWITCH_OAUTH_TOKEN=
         )
         reset_btn.grid(row=5, column=0, columnspan=2, pady=10)
 
-        personality_section = self.create_section(scrollable, "Bot's Personality", 3)
+        personality_section = self.create_section(wrapper, "Bot's Personality", 3)
         personality_section.grid_columnconfigure(0, weight=1)
         personality_section.grid_columnconfigure(1, weight=1)
 
@@ -1044,7 +1052,7 @@ TWITCH_OAUTH_TOKEN=
         )
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
-        test_section = self.create_section(scrollable, "Test Bot's Connection", 4)
+        test_section = self.create_section(wrapper, "Test Bot's Connection", 4)
         test_section.grid_columnconfigure(0, weight=1)
         test_section.grid_columnconfigure(1, weight=1)
 
@@ -1170,7 +1178,11 @@ TWITCH_OAUTH_TOKEN=
 
         scrollable = self.create_scrollable_frame(tab)
 
-        tts_frame = self.create_section(scrollable, "TTS Service", 0)
+        # Use balanced padding for wider content
+        wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
+        wrapper.pack(fill='both', expand=True, padx=(950, 150), pady=20)
+
+        tts_frame = self.create_section(wrapper, "TTS Service", 0)
         tts_frame.grid_columnconfigure(0, weight=1)
         tts_frame.grid_columnconfigure(1, weight=1)
 
@@ -1185,7 +1197,7 @@ TWITCH_OAUTH_TOKEN=
         tts_menu.grid(row=0, column=1, sticky='w', pady=5)
         tts_menu.bind('<<ComboboxSelected>>', self.on_tts_change)
 
-        voice_section = self.create_section(scrollable, "Voice Settings", 1)
+        voice_section = self.create_section(wrapper, "Voice Settings", 1)
         voice_section.grid_columnconfigure(0, weight=1)
         voice_section.grid_columnconfigure(1, weight=1)
 
@@ -1231,50 +1243,83 @@ TWITCH_OAUTH_TOKEN=
         self.tts_info_frame.grid(row=2, column=0, columnspan=3, sticky='ew', pady=10)
 
         # Create all info labels
-
         self.se_info = tk.Label(
             self.tts_info_frame,
-            text="StreamElements - Free, reliable, popular with streamers.",
+            text="",
             bg=self.colors['bg'],
             fg='#4CAF50',
             font=(self.ui_font[0], 9),
-            wraplength=600,
+            wraplength=500,
             justify='left'
         )
 
         self.elevenlabs_info = tk.Label(
             self.tts_info_frame,
-            text="ElevenLabs - Premium quality, custom voice cloning. Requires paid API key.",
+            text="",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
-            wraplength=600,
+            wraplength=500,
             justify='left'
         )
 
         self.azure_info = tk.Label(
             self.tts_info_frame,
-            text="Azure TTS - Microsoft's neural voices. High quality, generous free tier (5M chars/month).",
+            text="",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9),
-            wraplength=600,
+            wraplength=500,
             justify='left'
         )
 
-        self.elevenlabs_settings_section = self.create_section(scrollable, "ElevenLabs Voice Settings", 2)
+        # ElevenLabs settings section - always pack it in order, but hide contents
+        self.elevenlabs_settings_outer = tk.Frame(wrapper, bg=self.colors['bg'])
+        self.elevenlabs_settings_outer.pack(fill='x', padx=30, pady=15)  # Always pack it in position
+
+        # Create section inside the outer container
+        self.elevenlabs_settings_section = tk.Frame(self.elevenlabs_settings_outer, bg=self.colors['bg'])
+        self.elevenlabs_settings_section.pack(fill='x', padx=30, pady=15)
+
+        # Create section content
+        section_inner = tk.Frame(self.elevenlabs_settings_section, bg=self.colors['bg'])
+        section_inner.pack(anchor='center')
+
+        title_frame = tk.Frame(section_inner, bg=self.colors['bg'])
+        title_frame.pack(fill='x', pady=(0, 10))
 
         tk.Label(
-            self.elevenlabs_settings_section,
+            title_frame,
+            text="ElevenLabs Voice Settings",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold
+        ).pack(anchor='center')
+
+        separator = tk.Frame(title_frame, bg=self.colors['accent'], height=2)
+        separator.pack(fill='x', pady=(5, 0))
+
+        settings_frame = tk.Frame(section_inner, bg=self.colors['bg'])
+        settings_frame.pack(fill='both', padx=10)
+
+        settings_frame.grid_columnconfigure(0, weight=0)
+        settings_frame.grid_columnconfigure(1, weight=0)
+        settings_frame.grid_columnconfigure(2, weight=1)
+
+        # Stability
+        tk.Label(
+            settings_frame,
             text="Stability:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=self.ui_font
+            font=self.ui_font,
+            width=15,
+            anchor='w'
         ).grid(row=0, column=0, sticky='w', pady=5)
 
         self.stability_var = tk.DoubleVar(value=self.config.get('elevenlabs_stability', 0.5))
         stability_slider = tk.Scale(
-            self.elevenlabs_settings_section,
+            settings_frame,
             from_=0.0,
             to=1.0,
             resolution=0.05,
@@ -1283,30 +1328,33 @@ TWITCH_OAUTH_TOKEN=
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             highlightthickness=0,
-            length=200,
+            length=250,
             command=lambda v: [self.update_config('elevenlabs_stability', float(v)), self.reinitialize_tts()]
         )
         stability_slider.grid(row=0, column=1, sticky='w', pady=5, padx=10)
 
         tk.Label(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="(Lower = more variable, Higher = more stable)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 8, 'italic')
         ).grid(row=0, column=2, sticky='w', padx=5)
 
+        # Similarity Boost
         tk.Label(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="Similarity Boost:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=self.ui_font
+            font=self.ui_font,
+            width=15,
+            anchor='w'
         ).grid(row=1, column=0, sticky='w', pady=5)
 
         self.similarity_var = tk.DoubleVar(value=self.config.get('elevenlabs_similarity', 0.75))
         similarity_slider = tk.Scale(
-            self.elevenlabs_settings_section,
+            settings_frame,
             from_=0.0,
             to=1.0,
             resolution=0.05,
@@ -1315,30 +1363,33 @@ TWITCH_OAUTH_TOKEN=
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             highlightthickness=0,
-            length=200,
+            length=250,
             command=lambda v: [self.update_config('elevenlabs_similarity', float(v)), self.reinitialize_tts()]
         )
         similarity_slider.grid(row=1, column=1, sticky='w', pady=5, padx=10)
 
         tk.Label(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="(Higher = closer to original voice)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 8, 'italic')
         ).grid(row=1, column=2, sticky='w', padx=5)
 
+        # Style Exaggeration
         tk.Label(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="Style Exaggeration:",
             bg=self.colors['bg'],
             fg=self.colors['fg'],
-            font=self.ui_font
+            font=self.ui_font,
+            width=15,
+            anchor='w'
         ).grid(row=2, column=0, sticky='w', pady=5)
 
         self.style_var = tk.DoubleVar(value=self.config.get('elevenlabs_style', 0.0))
         style_slider = tk.Scale(
-            self.elevenlabs_settings_section,
+            settings_frame,
             from_=0.0,
             to=1.0,
             resolution=0.05,
@@ -1347,22 +1398,23 @@ TWITCH_OAUTH_TOKEN=
             bg=self.colors['bg'],
             fg=self.colors['fg'],
             highlightthickness=0,
-            length=200,
+            length=250,
             command=lambda v: [self.update_config('elevenlabs_style', float(v)), self.reinitialize_tts()]
         )
         style_slider.grid(row=2, column=1, sticky='w', pady=5, padx=10)
 
         tk.Label(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="(Higher = more expressive/dramatic)",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 8, 'italic')
         ).grid(row=2, column=2, sticky='w', padx=5)
 
+        # Speaker Boost checkbox
         self.speaker_boost_var = tk.BooleanVar(value=self.config.get('elevenlabs_speaker_boost', True))
         speaker_boost_check = tk.Checkbutton(
-            self.elevenlabs_settings_section,
+            settings_frame,
             text="Use Speaker Boost (enhances voice similarity)",
             variable=self.speaker_boost_var,
             bg=self.colors['bg'],
@@ -1375,39 +1427,10 @@ TWITCH_OAUTH_TOKEN=
         )
         speaker_boost_check.grid(row=3, column=0, columnspan=3, sticky='w', pady=10)
 
-        test_voice_section = self.create_section(scrollable, "Test Voice", 3)
-        test_voice_section.grid_columnconfigure(0, weight=1)
-        test_voice_section.grid_columnconfigure(1, weight=1)
-
-        tk.Label(
-            test_voice_section,
-            text="Test your selected voice before using it:",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font
-        ).grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
-
-        test_voice_btn = tk.Button(
-            test_voice_section,
-            text="Test Voice",
-            command=self.test_voice,
-            bg='#2196F3',
-            fg='white',
-            font=self.ui_font_bold,
-            relief='flat',
-            cursor='hand2',
-            width=15
-        )
-        test_voice_btn.grid(row=1, column=0, pady=10)
-
-        self.test_voice_label = tk.Label(
-            test_voice_section,
-            text="",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font
-        )
-        self.test_voice_label.grid(row=1, column=1, sticky='w', padx=10)
+        # Initially show/hide based on current service
+        if self.config['tts_service'] == 'elevenlabs':
+            self.elevenlabs_settings_section.pack(fill='x', padx=30, pady=15)
+        # If not elevenlabs, section frame is not packed (invisible but outer frame holds position)
 
         self.update_voice_dropdown()
 
@@ -1417,8 +1440,10 @@ TWITCH_OAUTH_TOKEN=
         notebook.add(tab, text='🎤 Inputs')
 
         scrollable = self.create_scrollable_frame(tab)
+        wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
+        wrapper.pack(fill='both', expand=True, padx=(110, 0), pady=20)
 
-        mic_section = self.create_section(scrollable, "Microphone Settings", 0)
+        mic_section = self.create_section(wrapper, "Microphone Settings", 0)
         mic_section.grid_columnconfigure(0, weight=1)
         mic_section.grid_columnconfigure(1, weight=1)
 
@@ -1533,12 +1558,12 @@ TWITCH_OAUTH_TOKEN=
         tips_frame.grid(row=5, column=0, columnspan=3, sticky='ew', pady=10, padx=20)
 
         tips_text = """
-        💡 Hotkey Tips:
-        • Use function keys: f1, f2, f3, etc.
-        • Use letters: a, b, c, etc.
+        Silly goofball tips:
         • Common choices: f4, f5, f6 (avoid f1/f11/f12 which may conflict)
         • Changes apply when you restart the chatbot
         • Make sure hotkeys don't conflict with other programs
+        • Honestly just use your numpad, you do have one right?
+        • What kinda loser buys a keyboard without a numpad
                 """
 
         tk.Label(
@@ -1563,7 +1588,7 @@ TWITCH_OAUTH_TOKEN=
         )
         mode_label.grid(row=2, column=1, sticky='w', pady=5)
 
-        screen_section = self.create_section(scrollable, "Screen Capture (Vision)", 1)
+        screen_section = self.create_section(wrapper, "Screen Capture (Vision)", 1)
         screen_section.grid_columnconfigure(0, weight=1)
         screen_section.grid_columnconfigure(1, weight=1)
 
@@ -1597,14 +1622,14 @@ TWITCH_OAUTH_TOKEN=
 
         self.test_screenshot_label = tk.Label(
             screen_section,
-            text="Takes a screenshot and has the bot describe what it sees",
+            text="Captures a screenshot of your display and has the bot react to it",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9, 'italic')
         )
         self.test_screenshot_label.grid(row=2, column=0, columnspan=2, sticky='w', pady=5)
 
-        twitch_section = self.create_section(scrollable, "Twitch Chat Integration", 2)
+        twitch_section = self.create_section(wrapper, "Twitch Chat Integration", 2)
         twitch_section.grid_columnconfigure(0, weight=1)
         twitch_section.grid_columnconfigure(1, weight=1)
 
@@ -1624,33 +1649,6 @@ TWITCH_OAUTH_TOKEN=
         twitch_check.grid(row=0, column=0, columnspan=2, sticky='w', pady=5)
 
         self.twitch_entry = self.create_entry(twitch_section, "Channel Name:", 'twitch_channel', 1)
-
-        tk.Label(
-            twitch_section,
-            text="━━━ Context Settings ━━━",
-            bg=self.colors['bg'],
-            fg=self.colors['accent'],
-            font=self.ui_font_bold
-        ).grid(row=2, column=0, columnspan=2, sticky='w', pady=(15, 5))
-
-        tk.Label(twitch_section, text="Include Username in input:",
-                 bg=self.colors['bg'], fg=self.colors['fg'],
-                 font=self.ui_font).grid(row=3, column=0, sticky='w', pady=5)
-
-        self.twitch_read_username_var = tk.BooleanVar(value=self.config.get('twitch_read_username', True))
-        username_check = tk.Checkbutton(
-            twitch_section,
-            text='Send "Username says: message" to the bot',
-            variable=self.twitch_read_username_var,
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=(self.ui_font[0], 9),
-            selectcolor=self.colors['entry_bg'],
-            activebackground=self.colors['bg'],
-            activeforeground=self.colors['fg'],
-            command=lambda: self.update_config('twitch_read_username', self.twitch_read_username_var.get())
-        )
-        username_check.grid(row=3, column=1, sticky='w', pady=5)
 
         tk.Label(
             twitch_section,
@@ -1998,51 +1996,101 @@ TWITCH_OAUTH_TOKEN=
     def create_avatar_tab(self, notebook):
         """Avatar tab with audio-reactive controls"""
         tab = tk.Frame(notebook, bg=self.colors['bg'])
-        notebook.add(tab, text='🎭 Avatar')
+        notebook.add(tab, text='Avatar')
 
         scrollable = self.create_scrollable_frame(tab)
+        wrapper = tk.Frame(scrollable, bg=self.colors['bg'])
+        wrapper.pack(fill='both', expand=True, padx=(35, 0), pady=20)
 
-        info_frame = tk.Frame(scrollable, bg=self.colors['entry_bg'], bd=2, relief='solid')
-        info_frame.pack(fill='x', padx=40, pady=25)
+        images_section = self.create_section(wrapper, "Select Avatar Images", 0)
+        images_section.grid_columnconfigure(0, weight=1)
 
-        info_text = """
-    AUDIO-REACTIVE FUNNY MOUTH SYSTEM
-
-    The little guy reacts to audio volume levels in real time
-
-    • SPEAKING IMAGE: Shown when audio volume is ABOVE threshold (mouth open)
-    • IDLE IMAGE: Shown when audio volume is BELOW threshold (mouth closed)
-    • AUTOMATIC SWITCHING: Avatar mouth opens and closes naturally with speech
-
-    The sensitivity slider lets you control when the mouth opens:
-      - LOWER = Opens easily (more sensitive, opens on quiet sounds)
-      - HIGHER = Opens only on loud sounds (less sensitive, requires louder audio)
-
-    HOW TO USE:
-    1. Select your idle and speaking images below
-    2. Choose your background color (green for OBS chroma key)
-    3. Adjust sensitivity slider to your preference
-    4. Click "Show Avatar Window" to display the avatar
-    5. In OBS: Window Capture → Select the Avatar window
-    6. Add Chroma Key filter to make background transparent
-    7. Play around with the audio slider to find the most natural looking movement
-        """
+        speaking_frame = tk.Frame(images_section, bg=self.colors['bg'])
+        speaking_frame.pack(fill='x', pady=10)
 
         tk.Label(
-            info_frame,
-            text=info_text,
+            speaking_frame,
+            text="Speaking Image:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold,
+            width=18,
+            anchor='w'
+        ).pack(side='left', padx=5)
+
+        self.speaking_path_label = tk.Label(
+            speaking_frame,
+            text=self.config.get('speaking_image', 'Not selected') or 'Not selected',
             bg=self.colors['entry_bg'],
             fg=self.colors['fg'],
-            font=self.ui_font,
-            justify='left'
-        ).pack(padx=30, pady=20)
+            font=(self.ui_font[0], 9),
+            relief='sunken',
+            anchor='w',
+            padx=10,
+            pady=5
+        )
+        self.speaking_path_label.pack(side='left', fill='x', expand=True, padx=5)
 
-        sensitivity_section = self.create_section(scrollable, "🎚️ Audio Sensitivity Controls", 0)
+        tk.Button(
+            speaking_frame,
+            text="Browse",
+            command=lambda: self.browse_image('speaking'),
+            bg=self.colors['button'],
+            fg='white',
+            font=self.ui_font_bold,
+            relief='raised',
+            borderwidth=2,
+            cursor='hand2',
+            padx=15,
+            pady=5
+        ).pack(side='left', padx=5)
+
+        idle_frame = tk.Frame(images_section, bg=self.colors['bg'])
+        idle_frame.pack(fill='x', pady=10)
+
+        tk.Label(
+            idle_frame,
+            text="Idle Image:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font_bold,
+            width=18,
+            anchor='w'
+        ).pack(side='left', padx=5)
+
+        self.idle_path_label = tk.Label(
+            idle_frame,
+            text=self.config.get('idle_image', 'Not selected') or 'Not selected',
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            relief='sunken',
+            anchor='w',
+            padx=10,
+            pady=5
+        )
+        self.idle_path_label.pack(side='left', fill='x', expand=True, padx=5)
+
+        tk.Button(
+            idle_frame,
+            text="Browse",
+            command=lambda: self.browse_image('idle'),
+            bg=self.colors['button'],
+            fg='white',
+            font=self.ui_font_bold,
+            relief='raised',
+            borderwidth=2,
+            cursor='hand2',
+            padx=15,
+            pady=5
+        ).pack(side='left', padx=5)
+
+        sensitivity_section = self.create_section(wrapper, "🎚️ Audio Sensitivity Controls", 1)
         sensitivity_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
             sensitivity_section,
-            text="Adjust how sensitive the avatar is to audio volume",
+            text="Fine-tune the appearance of the png mouth movement",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 10, 'italic')
@@ -2105,12 +2153,12 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 9)
         ).pack(side='right')
 
-        meter_section = self.create_section(scrollable, "🎵 Real-Time Audio Meter", 1)
+        meter_section = self.create_section(wrapper, "🎵 Real-Time Audio Meter", 2)
         meter_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
             meter_section,
-            text="Watch the meter during speech to see when avatar will open/close",
+            text="Watch the meter during speech to see when the png will change",
             bg=self.colors['bg'],
             fg=self.colors['accent'],
             font=(self.ui_font[0], 9, 'italic')
@@ -2179,7 +2227,7 @@ TWITCH_OAUTH_TOKEN=
         ).pack(pady=5)
 
         # Background Color Settings Section
-        bg_color_section = self.create_section(scrollable, "🎨 Background Color Settings", 2)
+        bg_color_section = self.create_section(wrapper, "🎨 Background Color Settings", 3)
         bg_color_section.grid_columnconfigure(0, weight=1)
 
         tk.Label(
@@ -2308,7 +2356,7 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 8, 'italic')
         ).pack(pady=5)
 
-        controls_section = self.create_section(scrollable, "Avatar Window Controls", 3)
+        controls_section = self.create_section(wrapper, "Avatar Window Controls", 4)
         controls_section.grid_columnconfigure(0, weight=1)
 
         control_frame = tk.Frame(controls_section, bg=self.colors['bg'])
@@ -2346,89 +2394,6 @@ TWITCH_OAUTH_TOKEN=
             font=(self.ui_font[0], 9, 'italic'),
             justify='center'
         ).pack(pady=10)
-
-        images_section = self.create_section(scrollable, "Select Avatar Images", 4)
-        images_section.grid_columnconfigure(0, weight=1)
-
-        speaking_frame = tk.Frame(images_section, bg=self.colors['bg'])
-        speaking_frame.pack(fill='x', pady=10)
-
-        tk.Label(
-            speaking_frame,
-            text="Speaking Image:",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font_bold,
-            width=18,
-            anchor='w'
-        ).pack(side='left', padx=5)
-
-        self.speaking_path_label = tk.Label(
-            speaking_frame,
-            text=self.config.get('speaking_image', 'Not selected') or 'Not selected',
-            bg=self.colors['entry_bg'],
-            fg=self.colors['fg'],
-            font=(self.ui_font[0], 9),
-            relief='sunken',
-            anchor='w',
-            padx=10,
-            pady=5
-        )
-        self.speaking_path_label.pack(side='left', fill='x', expand=True, padx=5)
-
-        tk.Button(
-            speaking_frame,
-            text="Browse",
-            command=lambda: self.browse_image('speaking'),
-            bg=self.colors['button'],
-            fg='white',
-            font=self.ui_font_bold,
-            relief='raised',
-            borderwidth=2,
-            cursor='hand2',
-            padx=15,
-            pady=5
-        ).pack(side='left', padx=5)
-
-        idle_frame = tk.Frame(images_section, bg=self.colors['bg'])
-        idle_frame.pack(fill='x', pady=10)
-
-        tk.Label(
-            idle_frame,
-            text="Idle Image:",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font_bold,
-            width=18,
-            anchor='w'
-        ).pack(side='left', padx=5)
-
-        self.idle_path_label = tk.Label(
-            idle_frame,
-            text=self.config.get('idle_image', 'Not selected') or 'Not selected',
-            bg=self.colors['entry_bg'],
-            fg=self.colors['fg'],
-            font=(self.ui_font[0], 9),
-            relief='sunken',
-            anchor='w',
-            padx=10,
-            pady=5
-        )
-        self.idle_path_label.pack(side='left', fill='x', expand=True, padx=5)
-
-        tk.Button(
-            idle_frame,
-            text="Browse",
-            command=lambda: self.browse_image('idle'),
-            bg=self.colors['button'],
-            fg='white',
-            font=self.ui_font_bold,
-            relief='raised',
-            borderwidth=2,
-            cursor='hand2',
-            padx=15,
-            pady=5
-        ).pack(side='left', padx=5)
 
         self.start_audio_meter_updates()
 
@@ -2839,15 +2804,16 @@ TWITCH_OAUTH_TOKEN=
         )
         self.recording_label.pack(anchor='w')
 
-        center_frame = tk.Frame(inner, bg=self.colors['accent'])
-        center_frame.pack(side='left', padx=40)
+        right_frame = tk.Frame(inner, bg=self.colors['accent'])
+        right_frame.pack(side='right')
 
-        # Update screenshot button to show hotkey
-        screenshot_hotkey = self.config.get('hotkey_screenshot', 'f5').upper()
-        self.screenshot_btn = tk.Button(
-            center_frame,
-            text=f"📸 Screenshot ({screenshot_hotkey})",  # CHANGED: Added hotkey display
-            command=self.screenshot_and_respond,
+        buttons_frame = tk.Frame(right_frame, bg=self.colors['accent'])
+        buttons_frame.pack()
+
+        update_btn = tk.Button(
+            buttons_frame,
+            text="🔄 Check for Updates",
+            command=self.manual_update_check,
             bg='#FF6B6B',
             fg='white',
             font=self.ui_font_bold,
@@ -2855,15 +2821,9 @@ TWITCH_OAUTH_TOKEN=
             borderwidth=3,
             cursor='hand2',
             padx=15,
-            pady=8
+            pady=10
         )
-        self.screenshot_btn.pack()
-
-        right_frame = tk.Frame(inner, bg=self.colors['accent'])
-        right_frame.pack(side='right')
-
-        buttons_frame = tk.Frame(right_frame, bg=self.colors['accent'])
-        buttons_frame.pack()
+        update_btn.pack(side='left', padx=5)
 
         save_btn = tk.Button(
             buttons_frame,
@@ -3312,9 +3272,17 @@ TWITCH_OAUTH_TOKEN=
 
     def on_tts_change(self, event=None):
         """Handle TTS service change"""
-        self.update_config('tts_service', self.tts_var.get())
+        service = self.tts_var.get()
+        self.update_config('tts_service', service)
         self.update_voice_dropdown()
         self.reinitialize_tts()
+
+        # Show/hide ElevenLabs settings by packing/unpacking the inner section
+        # The outer container stays in place to maintain layout
+        if service == 'elevenlabs':
+            self.elevenlabs_settings_section.pack(fill='x', padx=30, pady=15)
+        else:
+            self.elevenlabs_settings_section.pack_forget()
 
     def update_avatar_preview(self, filename):
         """Update the avatar preview with the selected image"""
@@ -3739,6 +3707,353 @@ TWITCH_OAUTH_TOKEN=
     def on_ai_speaking_end(self):
         """Called when AI finishes speaking"""
         self.status_label.config(text="🟢 Running")
+
+    def check_for_updates(self):
+        """Check for updates on startup"""
+        try:
+            print("[App] Checking for updates...")
+            update_info = updater.check_for_updates()
+
+            if update_info:
+                print(f"[App] Update available: v{update_info['version']}")
+
+                # Show update dialog
+                dialog = UpdateDialog(self.root, update_info)
+
+                if dialog.result:
+                    # User wants to update
+                    print("[App] User accepted update, downloading...")
+
+                    # Show progress window
+                    dialog.show_download_progress(self.root)
+
+                    # Download update
+                    new_exe = updater.download_update(
+                        update_info['url'],
+                        progress_callback=dialog.update_progress
+                    )
+
+                    if new_exe:
+                        print("[App] Download complete, applying update...")
+
+                        # Apply update and restart
+                        if updater.apply_update(new_exe):
+                            print("[App] Update applied, restarting...")
+                            # Exit the app - batch script will restart it
+                            self.root.quit()
+                            sys.exit(0)
+                        else:
+                            messagebox.showerror(
+                                "Update Failed",
+                                "Failed to apply update. Please try downloading manually."
+                            )
+                    else:
+                        messagebox.showerror(
+                            "Download Failed",
+                            "Failed to download update. Please check your internet connection."
+                        )
+
+                    # Close progress window
+                    if dialog.download_window:
+                        dialog.download_window.destroy()
+            else:
+                print("[App] No updates available")
+
+        except Exception as e:
+            print(f"[App] Error checking for updates: {e}")
+
+    def create_menu_bar(self):
+        """Create menu bar with File menu"""
+        menubar = tk.Menu(
+            self.root,
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            activebackground=self.colors['accent'],
+            activeforeground='white',
+            relief='flat',
+            borderwidth=0
+        )
+        self.root.config(menu=menubar)
+        try:
+            self.root.option_add('*Menu.background', self.colors['bg'])
+            self.root.option_add('*Menu.foreground', self.colors['fg'])
+            self.root.option_add('*Menu.activeBackground', self.colors['accent'])
+            self.root.option_add('*Menu.activeForeground', 'white')
+        except:
+            pass
+
+        # Bind keyboard shortcut
+        self.root.bind('<Control-u>', lambda e: self.manual_update_check())
+
+    def manual_update_check(self):
+        """Manual update check triggered by user"""
+        print("[App] Manual update check initiated by user...")
+
+        # Show checking message
+        checking_dialog = tk.Toplevel(self.root)
+        checking_dialog.title("Checking for Updates")
+        checking_dialog.geometry("300x100")
+        checking_dialog.resizable(False, False)
+        checking_dialog.transient(self.root)
+
+        # Center the dialog
+        checking_dialog.update_idletasks()
+        x = (checking_dialog.winfo_screenwidth() // 2) - 150
+        y = (checking_dialog.winfo_screenheight() // 2) - 50
+        checking_dialog.geometry(f"300x100+{x}+{y}")
+
+        tk.Label(
+            checking_dialog,
+            text="Checking for updates...",
+            font=('Arial', 11)
+        ).pack(pady=30)
+
+        # Force update the dialog
+        checking_dialog.update()
+
+        try:
+            update_info = updater.check_for_updates()
+
+            # Close checking dialog
+            checking_dialog.destroy()
+
+            if update_info:
+                print(f"[App] Update available: v{update_info['version']}")
+
+                # Show update dialog
+                dialog = UpdateDialog(self.root, update_info)
+
+                if dialog.result:
+                    # User wants to update
+                    print("[App] User accepted update, downloading...")
+
+                    # Show progress window
+                    dialog.show_download_progress(self.root)
+
+                    # Download update
+                    new_exe = updater.download_update(
+                        update_info['url'],
+                        progress_callback=dialog.update_progress
+                    )
+
+                    if new_exe:
+                        print("[App] Download complete, applying update...")
+
+                        # Apply update and restart
+                        if updater.apply_update(new_exe):
+                            print("[App] Update applied, restarting...")
+                            self.root.quit()
+                            sys.exit(0)
+                        else:
+                            messagebox.showerror(
+                                "Update Failed",
+                                "Failed to apply update. Please try downloading manually."
+                            )
+                    else:
+                        messagebox.showerror(
+                            "Download Failed",
+                            "Failed to download update. Please check your internet connection."
+                        )
+
+                    # Close progress window
+                    if dialog.download_window:
+                        dialog.download_window.destroy()
+            else:
+                # No updates available
+                print("[App] No updates available")
+                messagebox.showinfo(
+                    "No Updates",
+                    f"You're running the latest version (v{updater.CURRENT_VERSION})!",
+                    parent=self.root
+                )
+
+        except Exception as e:
+            # Close checking dialog if still open
+            try:
+                checking_dialog.destroy()
+            except:
+                pass
+
+            print(f"[App] Error checking for updates: {e}")
+            messagebox.showerror(
+                "Update Check Failed",
+                "Could not check for updates. Please check your internet connection.",
+                parent=self.root
+            )
+
+
+class UpdateDialog:
+    """Dialog for showing update information"""
+
+    def __init__(self, parent, update_info):
+        self.result = False
+        self.download_window = None
+
+        dialog = tk.Toplevel(parent)
+        dialog.title("Update Available")
+        dialog.geometry("500x400")
+        dialog.resizable(False, False)
+        dialog.transient(parent)
+        dialog.grab_set()
+
+        # Center the dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (500 // 2)
+        y = (dialog.winfo_screenheight() // 2) - (400 // 2)
+        dialog.geometry(f"500x400+{x}+{y}")
+
+        # Header
+        header = tk.Frame(dialog, bg='#9370DB', height=60)
+        header.pack(fill='x')
+        header.pack_propagate(False)
+
+        tk.Label(
+            header,
+            text="🎉 New Version Available!",
+            bg='#9370DB',
+            fg='white',
+            font=('Arial', 14, 'bold')
+        ).pack(pady=15)
+
+        # Content
+        content = tk.Frame(dialog, bg='white')
+        content.pack(fill='both', expand=True, padx=20, pady=20)
+
+        # Version info
+        info_frame = tk.Frame(content, bg='#F0F0F0', relief='solid', bd=1)
+        info_frame.pack(fill='x', pady=(0, 15))
+
+        tk.Label(
+            info_frame,
+            text=f"Current Version: {updater.CURRENT_VERSION}",
+            bg='#F0F0F0',
+            font=('Arial', 10)
+        ).pack(anchor='w', padx=10, pady=5)
+
+        tk.Label(
+            info_frame,
+            text=f"New Version: {update_info['version']}",
+            bg='#F0F0F0',
+            font=('Arial', 10, 'bold'),
+            fg='#2E7D32'
+        ).pack(anchor='w', padx=10, pady=5)
+
+        # Release notes
+        tk.Label(
+            content,
+            text="What's New:",
+            bg='white',
+            font=('Arial', 10, 'bold')
+        ).pack(anchor='w', pady=(0, 5))
+
+        notes_frame = tk.Frame(content, bg='white')
+        notes_frame.pack(fill='both', expand=True)
+
+        notes_text = tk.Text(
+            notes_frame,
+            wrap='word',
+            height=10,
+            bg='#FAFAFA',
+            font=('Arial', 9),
+            relief='solid',
+            bd=1
+        )
+        notes_text.pack(side='left', fill='both', expand=True)
+
+        scrollbar = tk.Scrollbar(notes_frame, command=notes_text.yview)
+        scrollbar.pack(side='right', fill='y')
+        notes_text.config(yscrollcommand=scrollbar.set)
+
+        notes_text.insert('1.0', update_info['notes'])
+        notes_text.config(state='disabled')
+
+        # Buttons
+        button_frame = tk.Frame(dialog, bg='white')
+        button_frame.pack(fill='x', padx=20, pady=(0, 20))
+
+        def on_update():
+            self.result = True
+            dialog.destroy()
+
+        def on_skip():
+            self.result = False
+            dialog.destroy()
+
+        update_btn = tk.Button(
+            button_frame,
+            text="Update Now",
+            command=on_update,
+            bg='#4CAF50',
+            fg='white',
+            font=('Arial', 10, 'bold'),
+            relief='flat',
+            padx=30,
+            pady=10,
+            cursor='hand2'
+        )
+        update_btn.pack(side='left', padx=(0, 10))
+
+        skip_btn = tk.Button(
+            button_frame,
+            text="Skip This Version",
+            command=on_skip,
+            bg='#9E9E9E',
+            fg='white',
+            font=('Arial', 10),
+            relief='flat',
+            padx=30,
+            pady=10,
+            cursor='hand2'
+        )
+        skip_btn.pack(side='left')
+
+        parent.wait_window(dialog)
+
+    def show_download_progress(self, parent):
+        """Show download progress window"""
+        self.download_window = tk.Toplevel(parent)
+        self.download_window.title("Downloading Update")
+        self.download_window.geometry("400x150")
+        self.download_window.resizable(False, False)
+        self.download_window.transient(parent)
+        self.download_window.grab_set()
+
+        # Center the window
+        self.download_window.update_idletasks()
+        x = (self.download_window.winfo_screenwidth() // 2) - 200
+        y = (self.download_window.winfo_screenheight() // 2) - 75
+        self.download_window.geometry(f"400x150+{x}+{y}")
+
+        tk.Label(
+            self.download_window,
+            text="Downloading update...",
+            font=('Arial', 12, 'bold')
+        ).pack(pady=20)
+
+        self.progress_var = tk.IntVar()
+        self.progress_bar = ttk.Progressbar(
+            self.download_window,
+            variable=self.progress_var,
+            maximum=100,
+            length=350
+        )
+        self.progress_bar.pack(pady=10)
+
+        self.progress_label = tk.Label(
+            self.download_window,
+            text="0%",
+            font=('Arial', 10)
+        )
+        self.progress_label.pack()
+
+        return self.download_window
+
+    def update_progress(self, progress):
+        """Update progress bar"""
+        if self.download_window:
+            self.progress_var.set(progress)
+            self.progress_label.config(text=f"{progress}%")
+            self.download_window.update()
 
 
 def main():
