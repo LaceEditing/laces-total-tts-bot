@@ -1052,44 +1052,44 @@ TWITCH_OAUTH_TOKEN=
         )
         save_personality_btn.grid(row=2, column=0, columnspan=2, pady=10)
 
-        test_section = self.create_section(wrapper, "Test Bot's Connection", 4)
-        test_section.grid_columnconfigure(0, weight=1)
-        test_section.grid_columnconfigure(1, weight=1)
-
-        test_info = tk.Label(
-            test_section,
-            text="Test your OpenAI API key and model configuration before starting the full chatbot:",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font,
-            wraplength=600,
-            justify='left'
-        )
-        test_info.grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
-
-        test_btn = tk.Button(
-            test_section,
-            text="🧪 Test Bot's Connection",
-            command=self.test_ai_connection,
-            bg='#2196F3',
-            fg='white',
-            font=self.ui_font_bold,
-            relief='flat',
-            cursor='hand2',
-            width=20
-        )
-        test_btn.grid(row=1, column=0, pady=10)
-
-        self.test_status_label = tk.Label(
-            test_section,
-            text="",
-            bg=self.colors['bg'],
-            fg=self.colors['fg'],
-            font=self.ui_font,
-            wraplength=600,
-            justify='left'
-        )
-        self.test_status_label.grid(row=1, column=1, sticky='w', padx=10)
+        # test_section = self.create_section(wrapper, "Test Bot's Connection", 4)
+        # test_section.grid_columnconfigure(0, weight=1)
+        # test_section.grid_columnconfigure(1, weight=1)
+        #
+        # test_info = tk.Label(
+        #     test_section,
+        #     text="Test your OpenAI API key and model configuration before starting the full chatbot:",
+        #     bg=self.colors['bg'],
+        #     fg=self.colors['fg'],
+        #     font=self.ui_font,
+        #     wraplength=600,
+        #     justify='left'
+        # )
+        # test_info.grid(row=0, column=0, columnspan=2, sticky='w', pady=(0, 10))
+        #
+        # test_btn = tk.Button(
+        #     test_section,
+        #     text="🧪 Test Bot's Connection",
+        #     command=self.test_ai_connection,
+        #     bg='#2196F3',
+        #     fg='white',
+        #     font=self.ui_font_bold,
+        #     relief='flat',
+        #     cursor='hand2',
+        #     width=20
+        # )
+        # test_btn.grid(row=1, column=0, pady=10)
+        #
+        # self.test_status_label = tk.Label(
+        #     test_section,
+        #     text="",
+        #     bg=self.colors['bg'],
+        #     fg=self.colors['fg'],
+        #     font=self.ui_font,
+        #     wraplength=600,
+        #     justify='left'
+        # )
+        # self.test_status_label.grid(row=1, column=1, sticky='w', padx=10)
 
     def on_response_length_change(self):
         """Handle response length selection change"""
