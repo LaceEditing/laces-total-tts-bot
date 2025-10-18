@@ -2,6 +2,7 @@
 import threading
 import time
 from pathlib import Path
+from collections import deque
 from llm_manager import LLMManager
 from tts_manager import TTSManager
 from input_handlers import InputManager
@@ -43,6 +44,11 @@ class ChatbotEngine:
         self.on_speaking_end = None
         self.on_volume_update = None
 
+        # TTS queue system for sequential speaking
+        self.tts_queue = deque()
+        self.tts_processing = False
+        self.tts_lock = threading.Lock()
+
     def load_config(self):
         """Load configuration"""
         if self.config_file.exists():
@@ -58,15 +64,25 @@ class ChatbotEngine:
             'user_name': 'User',
             'personality': 'You are a helpful AI assistant.',
             'llm_model': 'gpt-4o',
-            'tts_service': 'elevenlabs',
-            'elevenlabs_voice': 'default',
+            'tts_service': 'streamelements',
+            'elevenlabs_voice': 'Brian',
             'twitch_enabled': False,
             'twitch_channel': '',
+            'twitch_username_blacklist': [],
+            'twitch_emote_prefix_blacklist': [],
+            'twitch_cooldown': 5,
+            'twitch_response_mode': 'all',
+            'twitch_keywords': '!ai,!bot',
+            'twitch_response_chance': 100,
+            'twitch_read_username': True,
+            'twitch_speak_username': True,
+            'twitch_speak_message': True,
+            'twitch_strip_emojis': True,
             'mic_enabled': True,
             'screen_enabled': False,
-            'hotkey_toggle': 'f4',          # Microphone hotkey
-            'hotkey_stop': 'p',             # Stop recording (legacy)
-            'hotkey_screenshot': 'f5',      # ADD THIS LINE - Screenshot hotkey
+            'hotkey_toggle': 'F4',
+            'hotkey_stop': 'P',
+            'hotkey_screenshot': 'F5',
             'speaking_image': '',
             'idle_image': '',
             'avatar_bg_color': '#00FF00',
@@ -79,10 +95,70 @@ class ChatbotEngine:
             'elevenlabs_speaker_boost': True,
             'response_length': 'normal',
             'max_response_tokens': 150,
-            'twitch_speak_username': True,
-            'twitch_speak_message': True,
-            'twitch_strip_emojis': True,
+            'rate_limit_response': "I'm a bit overwhelmed right now, give me a moment!"
         }
+
+    def save_config(self):
+        """Save configuration to file"""
+        with open(self.config_file, 'w', encoding='utf-8') as f:
+            json.dump(self.config, f, indent=4, ensure_ascii=False)
+
+    def set_config(self, key, value):
+        """Update config"""
+        self.config[key] = value
+
+    def reload_config(self):
+        """Reload configuration"""
+        self.load_config()
+        self.initialize()
+
+    def initialize(self):
+        """Initialize LLM and TTS"""
+        system_prompt = self._build_system_prompt()
+
+        self.llm = LLMManager(
+            model=self.config['llm_model'],
+            system_prompt=system_prompt
+        )
+
+        elevenlabs_settings = {
+            'stability': self.config.get('elevenlabs_stability', 0.5),
+            'similarity_boost': self.config.get('elevenlabs_similarity', 0.75),
+            'style': self.config.get('elevenlabs_style', 0.0),
+            'use_speaker_boost': self.config.get('elevenlabs_speaker_boost', True)
+        }
+
+        self.tts = TTSManager(
+            service=self.config['tts_service'],
+            voice=self.config.get('elevenlabs_voice', 'default'),
+            elevenlabs_settings=elevenlabs_settings
+        )
+
+        self.tts.set_audio_callbacks(
+            on_start=self._on_audio_start,
+            on_active=self._on_audio_active,
+            on_silent=self._on_audio_silent,
+            on_end=self._on_audio_end
+        )
+
+        self.tts.set_volume_threshold(self.config.get('volume_threshold', 0.02))
+
+        if self.config.get('twitch_enabled', False) and self.config.get('twitch_channel'):
+            channel = self.config['twitch_channel']
+            oauth_token = os.getenv('TWITCH_OAUTH_TOKEN', '')
+
+            if oauth_token and not self.inputs.twitch:
+                self.inputs.enable_twitch(channel, oauth_token)
+
+        if self.config.get('speaking_image') and self.config.get('idle_image'):
+            if not self.avatar_window:
+                self.avatar_window = AvatarWindow(
+                    idle_image_path=self.config['idle_image'],
+                    speaking_image_path=self.config['speaking_image'],
+                    bg_color=self.config.get('avatar_bg_color', '#00FF00'),
+                    transparent=self.config.get('avatar_transparency', False),
+                    always_on_top=False
+                )
 
     def _build_system_prompt(self):
         """Build system prompt with personality and settings"""
@@ -102,112 +178,7 @@ class ChatbotEngine:
         elif response_length == 'detailed':
             system_prompt += "\n\nProvide thorough, detailed responses - typically 4-8 sentences (80-150 words)."
 
-        response_style = self.config.get('response_style', 'conversational')
-        if response_style == 'custom':
-            custom_style = self.config.get('custom_response_style', '')
-            if custom_style:
-                system_prompt += f"\n\n{custom_style}"
-
         return system_prompt
-
-    def initialize(self):
-        """Initialize all components"""
-        system_prompt = self._build_system_prompt()
-
-        self.llm = LLMManager(
-            model=self.config['llm_model'],
-            system_prompt=system_prompt,
-            max_tokens=self.config.get('max_context_tokens', 8000)
-        )
-
-        elevenlabs_settings = {
-            'stability': self.config.get('elevenlabs_stability', 0.5),
-            'similarity_boost': self.config.get('elevenlabs_similarity', 0.75),
-            'style': self.config.get('elevenlabs_style', 0.0),
-            'use_speaker_boost': self.config.get('elevenlabs_speaker_boost', True)
-        }
-
-        self.tts = TTSManager(
-            service=self.config['tts_service'],
-            voice=self.config['elevenlabs_voice'],
-            elevenlabs_settings=elevenlabs_settings
-        )
-
-        volume_threshold = self.config.get('volume_threshold', 0.02)
-        self.tts.set_volume_threshold(volume_threshold)
-
-        self.tts.set_audio_callbacks(
-            on_start=self._on_audio_start,
-            on_active=self._on_audio_active,
-            on_silent=self._on_audio_silent,
-            on_end=self._on_audio_end
-        )
-
-        if self.config['twitch_enabled'] and self.config['twitch_channel']:
-            self.inputs.enable_twitch(self.config['twitch_channel'])
-
-        if self.config['mic_enabled']:
-            self.inputs.enable_microphone()
-
-        if self.config['screen_enabled']:
-            self.inputs.enable_screen()
-
-        self._load_images()
-
-    def _load_images(self):
-        """Initialize avatar window with better error handling"""
-        try:
-            idle_path = self.config.get('idle_image', '')
-            speaking_path = self.config.get('speaking_image', '')
-            bg_color = self.config.get('avatar_bg_color', '#00FF00')
-            transparency = self.config.get('avatar_transparency', False)
-
-            print(f"[Engine] Loading avatar images...")
-            print(f"[Engine] Idle path: {idle_path}")
-            print(f"[Engine] Speaking path: {speaking_path}")
-            print(f"[Engine] Background color: {bg_color}")
-            print(f"[Engine] Transparency: {transparency}")
-
-            # Validate paths
-            if not idle_path or not speaking_path:
-                print("[Engine] ERROR: Image paths not configured")
-                return False
-
-            if not Path(idle_path).exists():
-                print(f"[Engine] ERROR: Idle image not found: {idle_path}")
-                return False
-
-            if not Path(speaking_path).exists():
-                print(f"[Engine] ERROR: Speaking image not found: {speaking_path}")
-                return False
-
-            # Create or reload avatar window
-            if self.avatar_window is None:
-                print("[Engine] Creating new avatar window...")
-                self.avatar_window = AvatarWindow(
-                    idle_image_path=idle_path,
-                    speaking_image_path=speaking_path,
-                    bg_color=bg_color,
-                    transparent=transparency,
-                    always_on_top=False
-                )
-                print("[Engine] ✅ Avatar window created")
-            else:
-                print("[Engine] Reloading images in existing window...")
-                success = self.avatar_window.load_images(idle_path, speaking_path)
-                if success:
-                    print("[Engine] ✅ Images reloaded")
-                else:
-                    print("[Engine] ❌ Failed to reload images")
-                    return False
-
-            return True
-
-        except Exception as e:
-            print(f"[Engine] ERROR in _load_images: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
 
     def start(self):
         """Start the chatbot"""
@@ -291,8 +262,6 @@ class ChatbotEngine:
 
     def _twitch_poll_loop(self):
         """Poll Twitch for messages"""
-        import random
-
         while self.twitch_running and self.is_running:
             try:
                 messages = self.inputs.get_twitch_messages()
@@ -304,6 +273,11 @@ class ChatbotEngine:
                     username = msg['username']
                     message = msg['message']
 
+                    # CHECK USERNAME BLACKLIST
+                    blacklist = self.config.get('twitch_username_blacklist', [])
+                    if username.lower() in [u.lower() for u in blacklist]:
+                        continue  # Skip blacklisted users
+
                     should_respond = self._should_respond_to_twitch(message)
 
                     if should_respond:
@@ -311,12 +285,9 @@ class ChatbotEngine:
                         cooldown = self.config.get('twitch_cooldown', 5)
 
                         if current_time - self.last_twitch_response_time >= cooldown:
-                            # Strip keyword from message if in keywords mode
-                            # Strip keyword from message if in keywords mode
                             cleaned_message = self._strip_keyword_from_message(message)
-
-                            # Strip emojis if enabled
                             cleaned_message = self._strip_emojis(cleaned_message)
+                            cleaned_message = self._strip_custom_emotes(cleaned_message)
 
                             self.current_twitch_username = username
                             self.current_twitch_message = cleaned_message
@@ -366,35 +337,46 @@ class ChatbotEngine:
         keywords = self.config.get('twitch_keywords', '!ai,!bot').split(',')
         message_lower = message.lower()
 
-        # Find and remove the first matching keyword
         for keyword in keywords:
             keyword = keyword.strip()
             keyword_lower = keyword.lower()
 
-            # Check if keyword exists in message
             if keyword_lower in message_lower:
-                # Find the position (case-insensitive)
                 pos = message_lower.find(keyword_lower)
-
-                # Remove the keyword and clean up extra spaces
                 message = (message[:pos] + message[pos + len(keyword):]).strip()
                 break
 
         return message
+
+    def _strip_custom_emotes(self, text):
+        """Remove custom emotes with blacklisted prefixes"""
+        prefix_blacklist = self.config.get('twitch_emote_prefix_blacklist', [])
+
+        if not prefix_blacklist:
+            return text
+
+        # Pattern matches :prefix_emotename: or prefix_emotename
+        for prefix in prefix_blacklist:
+            # Match both :prefix_xxx: and prefix_xxx patterns
+            pattern = rf':?{re.escape(prefix)}_?\w*:?'
+            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
 
     def _strip_emojis(self, text):
         """Remove emojis, emoticons, and Twitch emotes from text"""
         if not self.config.get('twitch_strip_emojis', True):
             return text
 
-        # 1. Remove Unicode emojis
+        # Remove Unicode emojis
         emoji_pattern = re.compile(
             "["
-            "\U0001F600-\U0001F64F"  # emoticons
-            "\U0001F300-\U0001F5FF"  # symbols & pictographs
-            "\U0001F680-\U0001F6FF"  # transport & map symbols
-            "\U0001F1E0-\U0001F1FF"  # flags
-            "\U00002500-\U00002BEF"  # chinese char
+            "\U0001F600-\U0001F64F"
+            "\U0001F300-\U0001F5FF"
+            "\U0001F680-\U0001F6FF"
+            "\U0001F1E0-\U0001F1FF"
+            "\U00002500-\U00002BEF"
             "\U00002702-\U000027B0"
             "\U000024C2-\U0001F251"
             "\U0001f926-\U0001f937"
@@ -412,85 +394,35 @@ class ChatbotEngine:
         )
         text = emoji_pattern.sub('', text)
 
-        # 2. Remove text-based emoticons (like :), :D, :(, etc.)
+        # Remove text-based emoticons
         emoticon_patterns = [
-            r':\)+',  # :) :)) :)))
-            r':\(+',  # :( :(( :(((
-            r':D+',  # :D :DD :DDD
-            r':P+',  # :P :PP
-            r':O+',  # :O :OO
-            r';-?\)+',  # ;) ;-)
-            r';-?\(+',  # ;( ;-(
-            r'<3+',  # <3 <33
-            r'>:\(+',  # >:(
-            r':-?\/+',  # :/ :-/
-            r':-?\|+',  # :| :-|
-            r'xD+',  # xD xDD
-            r'XD+',  # XD XDD
-            r':-?o+',  # :o :-o
-            r':-?O+',  # :O :-O
-            r'8-?\)+',  # 8) 8-)
-            r':-?\*+',  # :* :-*
-            r'B-?\)+',  # B) B-)
-            r':-?S+',  # :S :-S
-            r':-?@+',  # :@ :-@
-            r'T_T+',  # T_T
-            r'ToT+',  # ToT
-            r'\^\^+',  # ^^
-            r'o\.o',  # o.o
-            r'O\.O',  # O.O
-            r'-_-+',  # -_-
-            r'>_<+',  # >_<
-            r'=\)+',  # =) =))
-            r'=\(+',  # =( =((
-            r'=D+',  # =D =DD
-            r'=P+',  # =P =PP
+            r':\)+', r':\(+', r':D+', r':P+', r':O+', r';\)+',
+            r'XD+', r'xD+', r'>:\(+', r':\|+', r':/+', r':\\+',
+            r'<3+', r':3+', r':\*+', r';P+', r':S+', r':@+',
+            r'T_T+', r'ToT+', r'\^\^+', r'o\.o', r'O\.O',
+            r'-_-+', r'>_<+', r'=\)+', r'=\(+', r'=D+', r'=P+'
         ]
 
         for pattern in emoticon_patterns:
             text = re.sub(pattern, '', text, flags=re.IGNORECASE)
 
-        # 3. Remove common Twitch Global Emotes
+        # Remove common Twitch emotes
         common_twitch_emotes = [
-            # Global Twitch emotes
             'Kappa', 'PogChamp', 'LUL', 'TriHard', 'BibleThump', 'SMOrc', 'MingLee',
             'KappaPride', 'Kreygasm', 'DansGame', 'NotLikeThis', 'ResidentSleeper',
             'FailFish', 'WutFace', 'PJSalt', 'CoolStoryBob', 'EleGiggle', '4Head',
-            'SSSsss', 'Jebaited', 'SwiftRage', 'PraiseIt', 'CoolCat', 'TwitchLit',
-            'Squid1', 'Squid2', 'Squid3', 'Squid4', 'FBBlock', 'FBCatch', 'FBPass',
-            'FBRun', 'FBSpiral', 'TombRaid', 'TPFufun', 'TheTarFu', 'PunOko',
-            'SabaPing', 'PrimeMe', 'PogBones', 'PopCorn', 'RaccAttack', 'PowerUpL',
-            'PowerUpR', 'SoonerLater', 'KomodoHype', 'StinkyCheese', 'TakeNRG',
-            'TBAngel', 'ThankEgg', 'VoHiYo', 'WholeWheat', 'BlessRNG', 'DoritosChip',
-            'HeyGuys', 'UncleNox', 'FutureMan', 'ItsBoshyTime', 'NewRecord',
-
-            # BTTV emotes (BetterTTV)
             'KEKW', 'PepeLaugh', 'monkaS', 'Sadge', 'OMEGALUL', 'LULW', 'POGGERS',
-            'Pepega', 'pepeD', 'PepeHands', 'monkaW', 'monkaHmm', 'FeelsGoodMan',
-            'FeelsBadMan', 'FeelsWeirdMan', 'FeelsStrongMan', 'WeirdChamp', 'peepoHappy',
-            'peepoSad', 'Pog', 'EZ', 'CmonBruh', 'haHAA', 'TriDance', 'Clap',
-            'PepeLaugh', 'YEP', 'COCK', 'gachiHYPER', 'HYPERS', 'PauseChamp',
-
-            # FFZ emotes (FrankerFaceZ)
-            'LuL', 'CatBag', 'FeelsAmazingMan', 'PagChomp', 'Clap2', 'widepeepoHappy',
-            'widepeepoSad', 'WAYTOODANK', 'HACKERMANS', 'SourPls', 'WICKED',
-
-            # 7TV emotes
-            'GIGACHAD', 'Aware', 'Clueless', 'Stare', 'Susge', 'Madge', 'Bedge',
-            'Copium', 'Hopium', 'peepoTalk', 'NOTED', 'modCheck', 'Jammies',
+            'Pepega', 'FeelsGoodMan', 'FeelsBadMan', 'GIGACHAD', 'Copium', 'NOTED'
         ]
 
-        # Create word boundary pattern for emote names
         for emote in common_twitch_emotes:
-            # Use word boundaries to avoid removing parts of words
             pattern = r'\b' + re.escape(emote) + r'\b'
             text = re.sub(pattern, '', text, flags=re.IGNORECASE)
 
-        # 4. Remove excessive repeated characters (common in emote spam)
-        # But keep normal doubled letters like "too", "book", etc.
+        # Remove excessive repeated characters
         text = re.sub(r'(.)\1{3,}', r'\1', text)
 
-        # 5. Clean up excessive spaces
+        # Clean up spaces
         text = re.sub(r'\s+', ' ', text)
 
         return text.strip()
@@ -533,26 +465,63 @@ class ChatbotEngine:
             model = self.config['llm_model']
             vision_models = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo']
 
-            if image_data and model in vision_models:
-                response = self.llm.chat_with_vision(user_input, image_data, max_response_tokens=max_tokens)
-            else:
-                response = self.llm.chat(user_input, max_response_tokens=max_tokens)
+            try:
+                if image_data and model in vision_models:
+                    response = self.llm.chat_with_vision(user_input, image_data, max_response_tokens=max_tokens)
+                else:
+                    response = self.llm.chat(user_input, max_response_tokens=max_tokens)
+
+            except Exception as e:
+                # HANDLE RATE LIMITING
+                error_str = str(e).lower()
+                if 'rate' in error_str or 'quota' in error_str or 'limit' in error_str or '429' in error_str:
+                    response = self.config.get('rate_limit_response',
+                                               "I'm a bit overwhelmed right now, give me a moment!")
+                else:
+                    raise
 
             if self.on_response_callback:
                 self.on_response_callback(response)
 
-            self._speak_response(response)
+            # QUEUE THE SPEECH instead of speaking directly
+            self._queue_speech(response)
             self.save_conversation_history()
 
         except Exception:
             pass
+
+    def _queue_speech(self, text):
+        """Add speech to queue for sequential processing"""
+        with self.tts_lock:
+            self.tts_queue.append(text)
+
+            # Start processing if not already running
+            if not self.tts_processing:
+                self.tts_processing = True
+                threading.Thread(target=self._process_tts_queue, daemon=True).start()
+
+    def _process_tts_queue(self):
+        """Process TTS queue sequentially - ensures bot finishes speaking before next message"""
+        while True:
+            with self.tts_lock:
+                if not self.tts_queue:
+                    self.tts_processing = False
+                    break
+
+                text = self.tts_queue.popleft()
+
+            # Speak the response (blocks until complete)
+            self._speak_response(text)
 
     def _speak_response(self, text):
         """Speak response with Twitch context"""
         if not text.strip():
             return
 
-        tts_text = text
+        # STRIP EMOJIS FROM BOT'S OUTPUT
+        clean_text = self._strip_emojis(text)
+
+        tts_text = clean_text
 
         if self.current_twitch_username or self.current_twitch_message:
             prepend_parts = []
@@ -567,13 +536,14 @@ class ChatbotEngine:
                     prepend_parts.append(self.current_twitch_message)
 
             if prepend_parts:
-                tts_text = " ".join(prepend_parts) + ". " + text
+                tts_text = " ".join(prepend_parts) + ". " + clean_text
 
         def speak_thread():
             self.tts.speak(tts_text)
 
         thread = threading.Thread(target=speak_thread, daemon=True)
         thread.start()
+        thread.join()  # Wait for speech to complete
 
     def _show_avatar(self, state):
         """Show avatar in specific state"""
@@ -607,17 +577,8 @@ class ChatbotEngine:
             except Exception:
                 pass
 
-    def set_config(self, key, value):
-        """Update config"""
-        self.config[key] = value
-
-    def reload_config(self):
-        """Reload configuration"""
-        self.load_config()
-        self.initialize()
 
 if __name__ == '__main__':
-
     engine = ChatbotEngine()
     engine.initialize()
     engine.start()

@@ -1832,6 +1832,144 @@ TWITCH_OAUTH_TOKEN=
 
         cooldown_slider.config(command=lambda v: self.update_cooldown_label(int(float(v))))
 
+        # Username Blacklist Section
+        tk.Label(
+            twitch_section,
+            text="━━━ Username Blacklist ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=self.ui_font_bold
+        ).grid(row=20, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
+        tk.Label(
+            twitch_section,
+            text="Blacklisted Usernames:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font
+        ).grid(row=21, column=0, sticky='nw', pady=5)
+
+        self.username_blacklist_text = tk.Text(
+            twitch_section,
+            width=40,
+            height=4,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            insertbackground=self.colors['accent']
+        )
+        self.username_blacklist_text.grid(row=21, column=1, sticky='w', pady=5)
+
+        blacklist = self.config.get('twitch_username_blacklist', [])
+        self.username_blacklist_text.insert('1.0', '\n'.join(blacklist))
+
+        tk.Label(
+            twitch_section,
+            text='One username per line. Bot ignores these users completely.',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 8, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).grid(row=22, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # Emote Prefix Blacklist Section
+        tk.Label(
+            twitch_section,
+            text="━━━ Emote Prefix Blacklist ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=self.ui_font_bold
+        ).grid(row=23, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
+        tk.Label(
+            twitch_section,
+            text="Blacklisted Emote Prefixes:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font
+        ).grid(row=24, column=0, sticky='nw', pady=5)
+
+        self.emote_prefix_blacklist_text = tk.Text(
+            twitch_section,
+            width=40,
+            height=4,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            insertbackground=self.colors['accent']
+        )
+        self.emote_prefix_blacklist_text.grid(row=24, column=1, sticky='w', pady=5)
+
+        prefix_blacklist = self.config.get('twitch_emote_prefix_blacklist', [])
+        self.emote_prefix_blacklist_text.insert('1.0', '\n'.join(prefix_blacklist))
+
+        tk.Label(
+            twitch_section,
+            text='One prefix per line. Filters custom emotes starting with these.\nExample: "bttv" blocks :bttv_emotename:',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 8, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).grid(row=25, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # Rate Limit Response Section
+        tk.Label(
+            twitch_section,
+            text="━━━ Rate Limit Handling ━━━",
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=self.ui_font_bold
+        ).grid(row=26, column=0, columnspan=2, sticky='w', pady=(15, 5))
+
+        tk.Label(
+            twitch_section,
+            text="Rate Limit Response:",
+            bg=self.colors['bg'],
+            fg=self.colors['fg'],
+            font=self.ui_font
+        ).grid(row=27, column=0, sticky='nw', pady=5)
+
+        self.rate_limit_response_text = tk.Text(
+            twitch_section,
+            width=40,
+            height=3,
+            bg=self.colors['entry_bg'],
+            fg=self.colors['fg'],
+            font=(self.ui_font[0], 9),
+            insertbackground=self.colors['accent']
+        )
+        self.rate_limit_response_text.grid(row=27, column=1, sticky='w', pady=5)
+
+        rate_limit_msg = self.config.get('rate_limit_response', "I'm a bit overwhelmed right now, give me a moment!")
+        self.rate_limit_response_text.insert('1.0', rate_limit_msg)
+
+        tk.Label(
+            twitch_section,
+            text='Message bot says when rate limited by AI model.',
+            bg=self.colors['bg'],
+            fg=self.colors['accent'],
+            font=(self.ui_font[0], 8, 'italic'),
+            wraplength=500,
+            justify='left'
+        ).grid(row=28, column=0, columnspan=2, sticky='w', pady=(0, 10))
+
+        # Save Button
+        save_twitch_btn = tk.Button(
+            twitch_section,
+            text='💾 Save Twitch Settings',
+            command=self.save_twitch_blacklists,
+            bg=self.colors['button'],
+            fg='white',
+            font=self.ui_font_bold,
+            relief='flat',
+            cursor='hand2',
+            padx=20,
+            pady=10
+        )
+        save_twitch_btn.grid(row=29, column=0, columnspan=2, pady=20)
+
         tk.Label(
             twitch_section,
             text="Cooldown prevents spam - set to 0 to respond immediately to every message, which is probably a bad idea",
@@ -3283,6 +3421,29 @@ TWITCH_OAUTH_TOKEN=
         """Update configuration"""
         self.config[key] = value
         self.engine.set_config(key, value)
+
+    def save_twitch_blacklists(self):
+        """Save username blacklist, emote prefix blacklist, and rate limit response"""
+        # Save username blacklist
+        username_text = self.username_blacklist_text.get('1.0', 'end-1c')
+        usernames = [u.strip() for u in username_text.split('\n') if u.strip()]
+        self.config['twitch_username_blacklist'] = usernames
+
+        # Save emote prefix blacklist
+        prefix_text = self.emote_prefix_blacklist_text.get('1.0', 'end-1c')
+        prefixes = [p.strip() for p in prefix_text.split('\n') if p.strip()]
+        self.config['twitch_emote_prefix_blacklist'] = prefixes
+
+        # Save rate limit response
+        rate_limit_text = self.rate_limit_response_text.get('1.0', 'end-1c').strip()
+        if rate_limit_text:
+            self.config['rate_limit_response'] = rate_limit_text
+
+        # Save to file
+        self.engine.config = self.config
+        self.engine.save_config()
+
+        print("[App] Twitch blacklists and rate limit response saved!")
 
     def save_personality(self):
         """Save personality"""
